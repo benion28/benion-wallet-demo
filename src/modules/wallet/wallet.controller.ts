@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Body, Param, Request, UseGuards } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@/common/guards/jwt.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt.guard';
 
 @ApiTags('Wallet')
 @ApiBearerAuth()
@@ -21,7 +21,7 @@ export class WalletController {
   }
 
   @Get('balance')
-  async balance(@Request() req: any) {
+  async getBalance(@Request() req: any) {
     return this.walletService.getBalance(req.user.userId);
   }
 }

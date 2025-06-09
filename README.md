@@ -33,7 +33,7 @@ npm install
 ### 2. Run the Application
 
 ```bash
-npm run start:dev
+npm run server
 ```
 <!-- with docker  -->
 

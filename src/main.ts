@@ -5,6 +5,12 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Enable CORS
+  app.enableCors();
+  
+  // Add global prefix 'api' to all routes
+  app.setGlobalPrefix('api');
+
   const config = new DocumentBuilder()
     .setTitle('Bill Vending API')
     .setDescription('API for wallet funding and bill payment')
@@ -17,5 +23,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   await app.listen(3000);
+  console.log(`Application is running on: http://localhost:3000`);
+  console.log(`API Documentation: http://localhost:3000/api/docs`);
 }
 bootstrap();

@@ -1,16 +1,23 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private configService: ConfigService,
+  ) {}
 
   async validateUser(apiKey: string): Promise<boolean> {
-    // For login/register, use x-api-key validation here or delegate to a guard
-    return apiKey === process.env.API_KEY;
+    // In a real app, you would validate the API key against your database
+    return apiKey === this.configService.get<string>('API_KEY');
   }
 
   async generateToken(userId: string) {
-    return this.jwtService.sign({ sub: userId });
+    const payload = { userId };
+    return {
+      access_token: this.jwtService.sign(payload),
+    };
   }
 }

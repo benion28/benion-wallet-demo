@@ -19,6 +19,6 @@ import { BillsService } from './bills.service';
       inject: [ConfigService],
     },
   ],
-  exports: ['PAYMENT_SERVICE'],
+  exports: [BillsService, 'PAYMENT_SERVICE'],
 })
 export class BillsModule {}
