@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { BillsService } from './bills.service';
-import { BillsController } from './bills.controller';
 import { PaystackService } from './providers/paystack.service';
 import { MockPaymentService } from './providers/mock-payment.service';
 import { ConfigService } from '@nestjs/config';
+import { BillsController } from './bills.controller';
+import { BillsService } from './bills.service';
 
 @Module({
   controllers: [BillsController],
