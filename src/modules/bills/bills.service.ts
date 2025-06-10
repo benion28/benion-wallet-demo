@@ -1,15 +1,15 @@
-import { IPaymentGateway } from '@/common/interfaces/payment-gateway.interface';
+// src/modules/bills/bills.service.ts
 import { Inject, Injectable } from '@nestjs/common';
+import { PaymentGateway } from '../../common/interfaces/payment-gateway.interface';
 
 @Injectable()
 export class BillsService {
-  constructor(@Inject('PAYMENT_SERVICE') private readonly paymentGateway: IPaymentGateway) {}
+  constructor(
+    @Inject('PAYMENT_GATEWAY')
+    private readonly paymentGateway: PaymentGateway,
+  ) {}
 
-  async initializePayment(data: any) {
-    return this.paymentGateway.initializeTransaction(data);
-  }
-
-  async verifyPayment(reference: string) {
-    return this.paymentGateway.verifyTransaction(reference);
+  async initializePayment(amount: number, email: string, reference: string, metadata?: any) {
+    return this.paymentGateway.initializePayment(amount, email, reference, metadata);
   }
 }

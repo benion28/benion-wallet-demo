@@ -1,24 +1,13 @@
+// src/modules/bills/bills.module.ts
 import { Module } from '@nestjs/common';
-import { PaystackService } from './providers/paystack.service';
-import { MockPaymentService } from './providers/mock-payment.service';
-import { ConfigService } from '@nestjs/config';
-import { BillsController } from './bills.controller';
 import { BillsService } from './bills.service';
+import { BillsController } from './bills.controller';
+import { PaymentModule } from '../payment/payment.module';
 
 @Module({
+  imports: [PaymentModule], // Import PaymentModule here
   controllers: [BillsController],
-  providers: [
-    BillsService,
-    {
-      provide: 'PAYMENT_SERVICE',
-      useFactory: (config: ConfigService) => {
-        return config.get('NODE_ENV') === 'production'
-          ? new PaystackService()
-          : new MockPaymentService();
-      },
-      inject: [ConfigService],
-    },
-  ],
-  exports: [BillsService, 'PAYMENT_SERVICE'],
+  providers: [BillsService],
+  exports: [BillsService],
 })
 export class BillsModule {}

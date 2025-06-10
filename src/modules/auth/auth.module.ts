@@ -1,37 +1,29 @@
-import { Module } from '@nestjs/common';
+// src/modules/auth/auth.module.ts
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
 import { PassportModule } from '@nestjs/passport';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtStrategy } from './stragies/jwt.strategy';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { JwtStrategy } from './jwt.strategy';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { ApiKeyGuard } from './guards/api-key.guard';
+import { UsersModule } from '../users/users.module';
+import { LocalStrategy } from './stragies/local.strategy';
 
 @Module({
   imports: [
-    ConfigModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '1h' },
+        signOptions: { expiresIn: '1d' },
       }),
+      inject: [ConfigService],
     }),
-  ],
-  providers: [
-    AuthService,
-    JwtStrategy,
-    ApiKeyGuard,
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
+    forwardRef(() => UsersModule), // Use forwardRef for circular dependency
   ],
   controllers: [AuthController],
-  exports: [AuthService, JwtModule, ApiKeyGuard],
+  providers: [AuthService, JwtStrategy, LocalStrategy],
+  exports: [AuthService, JwtModule], // Export JwtModule to make it available to other modules
 })
 export class AuthModule {}

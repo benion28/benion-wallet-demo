@@ -1,33 +1,41 @@
-import { Controller, Post, Headers, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiHeader, ApiResponse } from '@nestjs/swagger';
+import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiHeader } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { ApiKeyGuard } from './guards/api-key.guard';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { LocalAuthGuard } from './guards/local-auth.guard';
+import { Public } from '../../common/decorators/public.decorator';
+import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 
-@ApiTags('Authentication')
+@ApiTags('auth')
 @Controller('auth')
+@ApiHeader({
+  name: 'x-api-key',
+  description: 'API Key',
+  required: true,
+})
+@UseGuards(ApiKeyGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
+  @UseGuards(LocalAuthGuard)
   @Post('login')
-  @UseGuards(ApiKeyGuard)
-  @ApiHeader({ name: 'x-api-key', required: true })
+  @ApiOperation({ summary: 'Login user' })
+  @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async login(@Headers('x-api-key') apiKey: string) {
-    // The API key is already validated by the ApiKeyGuard
-    // In a real app, you would validate the user's credentials here
-    const userId = 'user-id-123'; // Replace with actual user lookup
-    return this.authService.generateToken(userId);
+  async login(@Request() req: any) {
+    return this.authService.login(req.user);
   }
 
+  @Public()
   @Post('register')
-  @UseGuards(ApiKeyGuard)
-  @ApiHeader({ name: 'x-api-key', required: true })
+  @ApiOperation({ summary: 'Register new user' })
+  @ApiBody({ type: RegisterDto })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @ApiResponse({ status: 400, description: 'Bad Request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async register() {
-    // Your registration logic here
-    return { message: 'User registered successfully' };
+  async register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
   }
 }

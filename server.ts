@@ -1,49 +1,88 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './src/app.module';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import * as path from 'path';
-
-// Add this to handle module paths
-import * as tsConfigPaths from 'tsconfig-paths';
-
-// This will read the paths from tsconfig.json and register them
-const tsConfig = require('./tsconfig.json');
-const baseUrl = path.resolve(__dirname, '.');
-
-// Register path aliases
-tsConfigPaths.register({
-  baseUrl,
-  paths: tsConfig.compilerOptions.paths,
-});
+import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { HttpExceptionFilter } from './src/common/filters/http-exception.filter';
 
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
     const configService = app.get(ConfigService);
-  
-    app.enableCors();
+
+    // Global prefix
     app.setGlobalPrefix('api');
 
+    // Enable CORS
+    app.enableCors({
+      origin: configService.get('CORS_ORIGIN', '*'),
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+      credentials: true,
+    });
+
+    // Global validation pipe
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: true,
+        transformOptions: {
+          enableImplicitConversion: true,
+        },
+      }),
+    );
+
+    // Global exception filter
+    app.useGlobalFilters(new HttpExceptionFilter());
+
+    // Swagger documentation
     const config = new DocumentBuilder()
-      .setTitle('Bill Vending API')
-      .setDescription('API for wallet funding and bill payment')
+      .setTitle('Wallet API')
+      .setDescription('Wallet API documentation')
       .setVersion('1.0')
-      .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'x-api-key')
-      .addBearerAuth()
+      .addBearerAuth(
+        { 
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Enter JWT token',
+          in: 'header',
+        },
+        'JWT-auth',
+      )
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
+    });
 
-    const port = configService.get<number>('PORT') || 3001;
+    // Start server
+    const port = configService.get<number>('PORT') || 3000;
     await app.listen(port);
-    console.log(`Application is running on: http://localhost:${port}`);
-    console.log(`API Documentation: http://localhost:${port}/api/docs`);
+    
+    console.log(`🚀 NestJS Server running on: http://localhost:${port}`);
+    console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
+    
+    return app;
   } catch (err) {
-    console.error('Failed to start server:', err);
+    console.error('❌ Failed to start NestJS server:', err);
     process.exit(1);
   }
 }
 
-bootstrap();
+// Only start the server if this file is run directly (not imported)
+if (require.main === module) {
+  bootstrap().catch(err => {
+    console.error('❌ Error during bootstrap:', err);
+    process.exit(1);
+  });
+}
+
+// Export the bootstrap function for testing
+export { bootstrap };
