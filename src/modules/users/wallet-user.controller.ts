@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, HttpStatus, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse as SwaggerResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -9,7 +9,7 @@ import { WalletUserService } from './wallet-user.service';
 import { ApiResponse } from '../../common/utils/api-response.util';
 import { UpdateWalletUserDto } from './dto/update-wallet-user.dto';
 
-@ApiTags('users')
+@ApiTags('Users')
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
@@ -64,9 +64,10 @@ export class WalletUserController {
   @ApiOperation({ summary: 'Get user by ID' })
   @SwaggerResponse({ status: 200, description: 'User retrieved successfully' })
   @SwaggerResponse({ status: 404, description: 'User not found' })
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string, @Request() req: any) {
     try {
-      const user = await this.walletUserService.findOne(id);
+      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
+      const user = await this.walletUserService.findOne(userId);
       if (!user) {
         return ApiResponse.error({
           status: HttpStatus.NOT_FOUND,
@@ -96,9 +97,11 @@ export class WalletUserController {
   async update(
     @Param('id') id: string,
     @Body() updateWalletUserDto: UpdateWalletUserDto,
+    @Request() req: any
   ) {
     try {
-      const user = await this.walletUserService.update(id, updateWalletUserDto);
+      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
+      const user = await this.walletUserService.update(userId, updateWalletUserDto);
       if (!user) {
         return ApiResponse.error({
           status: HttpStatus.NOT_FOUND,

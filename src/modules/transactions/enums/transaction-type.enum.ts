@@ -1,4 +1,3 @@
-// src/modules/transactions/enums/transaction-type.enum.ts
 export enum TransactionType {
   CREDIT = 'credit',
   DEBIT = 'debit',
@@ -6,4 +5,10 @@ export enum TransactionType {
   BILL_PAYMENT = 'bill_payment',
   FUND_WALLET = 'fund_wallet',
   WITHDRAWAL = 'withdrawal',
+}
+
+export enum TransactionStatus {
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
 }

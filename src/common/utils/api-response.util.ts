@@ -6,13 +6,15 @@ export class ApiResponse {
     success = true,
     message = 'Operation successful',
     data = null,
-  }: Partial<IApiResponse<T>> & { data?: T }): IApiResponse<T> {
+    pagination = null,
+  }: Partial<IApiResponse<T>> & { data?: T, pagination?: any }): IApiResponse<T> {
     return {
       success,
       status,
       message,
       data,
       timestamp: new Date().toISOString(),
+      pagination
     };
   }
 

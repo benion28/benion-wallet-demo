@@ -1,16 +1,18 @@
-// src/modules/auth/auth.module.ts
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtStrategy } from './stragies/jwt.strategy';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
+import { WalletModule } from '../wallet/wallet.module';  // Import WalletModule
 import { LocalStrategy } from './stragies/local.strategy';
+import { JwtStrategy } from './stragies/jwt.strategy';
 
 @Module({
   imports: [
+    UsersModule,
+    WalletModule,  // Import WalletModule here
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -20,10 +22,9 @@ import { LocalStrategy } from './stragies/local.strategy';
       }),
       inject: [ConfigService],
     }),
-    forwardRef(() => UsersModule), // Use forwardRef for circular dependency
   ],
+  providers: [AuthService, LocalStrategy, JwtStrategy],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy],
-  exports: [AuthService, JwtModule], // Export JwtModule to make it available to other modules
+  exports: [AuthService, JwtModule],  // Only export AuthService and JwtModule
 })
 export class AuthModule {}

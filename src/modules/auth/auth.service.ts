@@ -6,12 +6,14 @@ import { RegisterDto } from './dto/register.dto';
 import { CreateWalletUserDto } from '../users/dto/create-wallet-user.dto';
 import { UserRole } from './enums/user-role.enum';
 import { ApiResponse } from '../../common/utils/api-response.util';
+import { WalletService } from '../wallet/wallet.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: WalletUserService,
     private jwtService: JwtService,
+    private readonly walletService: WalletService,
   ) {}
 
   async validateUser(email: string, pass: string): Promise<any> {
@@ -89,6 +91,9 @@ export class AuthService {
 
       // Create and save the user
       const savedUser = await this.usersService.create(createUserDto);
+      
+      // Create wallet for the new user
+      await this.walletService.getOrCreateWallet(savedUser._id.toString());
       
       return ApiResponse.success({
         status: 201,

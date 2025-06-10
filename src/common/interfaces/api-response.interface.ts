@@ -5,4 +5,10 @@ export interface IApiResponse<T = any> {
     data?: T;
     error?: string;
     timestamp: string;
+    pagination?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    }
 }

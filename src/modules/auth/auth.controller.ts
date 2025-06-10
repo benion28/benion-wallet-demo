@@ -7,7 +7,7 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 
-@ApiTags('auth')
+@ApiTags('Auth')
 @Controller('auth')
 @ApiHeader({
   name: 'x-api-key',
