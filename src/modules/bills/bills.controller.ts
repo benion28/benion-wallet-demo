@@ -1,6 +1,9 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, UseGuards, Request } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BillsService } from './bills.service';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { CreateBillDto } from '@/modules/bills/dto/create-bill.dto';
+import { BillResponseDto } from '@/modules/bills/dto/bill-response.dto';
 
 @ApiTags('Bills')
 @ApiBearerAuth()
@@ -8,13 +11,29 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 export class BillsController {
   constructor(private readonly billsService: BillsService) {}
 
-  @Post('initiate')
-  async initiate(@Body() body: any) {
-    return this.billsService.initializePayment(body);
+  @Post('pay')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Process a bill payment' })
+  @ApiResponse({ status: 200, description: 'Payment processed successfully', type: BillResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid payment data' })
+  @ApiResponse({ status: 404, description: 'Wallet not found' })
+  @ApiResponse({ status: 500, description: 'Payment processing failed' })
+  async pay(
+    @Request() req,
+    @Body() createBillDto: CreateBillDto
+  ): Promise<BillResponseDto> {
+    return this.billsService.processBillPayment(req.user.userId, createBillDto);
   }
 
-  @Get('verify/:reference')
-  async verify(@Param('reference') reference: string) {
-    return this.billsService.verifyPayment(reference);
+  @Get('status/:transactionId')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Check bill payment status' })
+  @ApiResponse({ status: 200, description: 'Payment status retrieved', type: BillResponseDto })
+  @ApiResponse({ status: 404, description: 'Transaction not found' })
+  async getPaymentStatus(
+    @Param('transactionId') transactionId: string,
+    @Request() req
+  ): Promise<BillResponseDto> {
+    return this.billsService.getPaymentStatus(transactionId, req.user.userId);
   }
 }

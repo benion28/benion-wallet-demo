@@ -9,6 +9,7 @@ import { CreateWalletDto } from './dto/create-wallet.dto';
 import { TransactionStatus } from '../transactions/enums/transaction-type.enum';
 import { FundWalletDto } from './dto/fund-wallet.dto';
 import { ApiResponse } from '../../common/utils/api-response.util';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @Injectable()
 export class WalletService {
@@ -25,6 +26,73 @@ export class WalletService {
   
   async findByWalletId(walletId: string) {
     return this.walletModel.findById(walletId).exec();
+  }
+
+  async findByWalletUser(userId: string) {
+    try {
+      const wallet = await this.walletModel.findOne({ userId }).exec();
+      if (!wallet) {
+        throw new NotFoundException(`Wallet not found for user ${userId}`);
+      }
+      return wallet;
+    } catch (error) {
+      this.logger.error(`Error finding wallet for user ${userId}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async deductAmount(userId: string, amount: number, transactionId: string): Promise<void> {
+    try {
+      const wallet = await this.walletModel.findOneAndUpdate(
+        { userId },
+        { $inc: { balance: -amount } },
+        { new: true }
+      ).exec();
+
+      if (!wallet) {
+        throw new NotFoundException('Wallet not found');
+      }
+
+      // Create transaction record
+      await this.transactionsService.create({
+        userId,
+        amount,
+        status: 'pending',
+        type: 'debit',
+        metadata: { transactionId }
+      });
+
+    } catch (error) {
+      this.logger.error(`Error deducting amount from wallet: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async addAmount(userId: string, amount: number, transactionId: string): Promise<void> {
+    try {
+      const wallet = await this.walletModel.findOneAndUpdate(
+        { userId },
+        { $inc: { balance: amount } },
+        { new: true }
+      ).exec();
+
+      if (!wallet) {
+        throw new NotFoundException('Wallet not found');
+      }
+
+      // Create transaction record
+      await this.transactionsService.create({
+        userId,
+        amount,
+        status: 'success',
+        type: 'credit',
+        metadata: { transactionId }
+      });
+
+    } catch (error) {
+      this.logger.error(`Error adding amount to wallet: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   async create(createWalletDto: CreateWalletDto) {
@@ -69,11 +137,6 @@ export class WalletService {
         error: error.name
       });
     }
-  }
-
-  async findByWalletUser(userId: string) {
-    console.log(userId);
-    return await this.walletModel.findOne({ userId });
   }
 
     // Add a method to get or create wallet
