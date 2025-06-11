@@ -9,6 +9,7 @@ import { UserRole } from '../auth/enums/user-role.enum';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { Logger } from '@nestjs/common';
 import { WalletService } from '../wallet/wallet.service';
+import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
 
 @ApiTags('Transactions')
 @Controller('transactions')
@@ -119,21 +120,7 @@ export class TransactionsController {
     @Body() createTransactionDto: CreateTransactionDto,
     @Request() req: any
   ) {
-    try {
-      // Validate wallet exists
-      const wallet = await this.walletService.findByWalletId(createTransactionDto.walletId);
-      if (!wallet) {
-        throw new Error('Wallet not found');
-      }
-
-      // Create transaction
-      const transaction = await this.transactionsService.create(createTransactionDto);
-
-      return transaction;
-    } catch (error) {
-      this.logger.error(`Error creating transaction: ${error.message}`, error.stack);
-      throw error;
-    }
+    return await this.transactionsService.handleCreate(createTransactionDto);
   }
 
   @Get()
@@ -168,26 +155,7 @@ export class TransactionsController {
   @ApiResponse({ status: 200, description: 'Return transaction by ID' })
   @ApiResponse({ status: 404, description: 'Transaction not found' })
   async findOne(@Param('id') id: string, @Request() req: any) {
-    try {
-      const transaction = await this.transactionsService.findOne(id);
-      
-      if (!transaction) {
-        throw new NotFoundException('Transaction not found');
-      }
-
-      // If not admin, ensure user can only access their own transactions
-      const wallet = await this.walletService.findByWalletId(transaction.walletId.toString());
-      const walletUserId = wallet.userId.toString();
-      const userId = req.user.id.toString();
-      if (!req.user.roles.includes(UserRole.ADMIN) && walletUserId !== userId) {
-        throw new NotFoundException('Transaction not found');
-      }
-
-      return transaction;
-    } catch (error) {
-      this.logger.error(`Error fetching transaction: ${error.message}`, error.stack);
-      throw error; // Let NestJS handle the error
-    }
+    return await this.transactionsService.handleFindOne(id, req.user);
   }
 
   @Delete(':id')
@@ -196,25 +164,6 @@ export class TransactionsController {
   @ApiResponse({ status: 201, description: 'Transaction created successfully', })
   @ApiResponse({ status: 404, description: 'Transaction not found' })
   async delete(@Param('id') id: string, @Request() req: any) {
-    try {
-      // First find the transaction to validate it exists
-      const transaction = await this.transactionsService.findOne(id);
-      
-      if (!transaction) {
-        throw new NotFoundException('Transaction not found');
-      }
-
-      // Delete the transaction
-      const deletedTransaction = await this.transactionsService.delete(id);
-      
-      if (!deletedTransaction) {
-        throw new NotFoundException('Transaction not found');
-      }
-
-      return null;
-    } catch (error) {
-      this.logger.error(`Error deleting transaction: ${error.message}`, error.stack);
-      throw error; // Let NestJS handle the error
-    }
+    return await this.transactionsService.handleDelete(id, req.user);
   }
 }

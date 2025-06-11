@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiHeader } from '@nestjs/
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UserRole } from './enums/user-role.enum';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
@@ -26,47 +27,30 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @ApiOperation({
-    summary: 'Login user',
-    description: 'Authenticate user and return JWT token'
+    summary: 'User login',
+    description: 'Authenticate user and get access token'
   })
-  @ApiBody({
-    type: LoginDto,
-    schema: {
-      properties: {
-        email: {
-          type: 'string',
-          description: 'User email address',
-          example: 'user@example.com'
-        },
-        password: {
-          type: 'string',
-          description: 'User password',
-          example: 'securepassword123'
-        }
-      },
-      required: ['email', 'password']
-    }
-  })
+  @ApiBody({ type: LoginDto })
   @ApiResponse({
     status: 200,
     description: 'Successfully logged in',
     schema: {
       type: 'object',
       properties: {
-        status: { type: 'number', example: 200 },
-        message: { type: 'string', example: 'Login successful' },
-        data: {
-          type: 'object',
-          properties: {
-            token: { type: 'string', example: 'eyJhbGciOiJIUzI1NiJ9...' }
-          }
-        }
+        _id: { type: 'string' },
+        email: { type: 'string' },
+        firstName: { type: 'string' },
+        lastName: { type: 'string' },
+        role: { type: 'string', enum: Object.values(UserRole) },
+        accessToken: { type: 'string' },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' }
       }
     }
   })
   @ApiResponse({
     status: 401,
-    description: 'Unauthorized',
+    description: 'Invalid credentials',
     schema: {
       type: 'object',
       properties: {
@@ -76,8 +60,8 @@ export class AuthController {
       }
     }
   })
-  async login(@Request() req: any) {
-    return this.authService.login(req.user);
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
   }
 
   @Public()

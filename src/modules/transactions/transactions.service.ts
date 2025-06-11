@@ -8,6 +8,9 @@ import { forwardRef } from '@nestjs/common';
 import { PaginationResponse } from './dto/pagination-response.dto';
 
 import { Wallet } from '../wallet/schemas/wallet.schema';
+import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
+import { TransactionStatus } from './enums/transaction-type.enum';
+import { UserRole } from '../auth/enums/user-role.enum';
 
 @Injectable()
 export class TransactionsService {
@@ -50,6 +53,128 @@ export class TransactionsService {
   async create(createTransactionDto: any) {
     const transaction = new this.transactionModel(createTransactionDto);
     return transaction.save();
+  }
+
+  async handleCreate(createTransactionDto: any) {
+    try {
+        // Validate wallet exists
+        const wallet = await this.walletService.findByWalletId(createTransactionDto.walletId);
+        if (!wallet) {
+          return CustomApiResponse.error({
+            message: 'Wallet not found',
+            status: 404,
+            error: 'Wallet does not exist'
+          });
+        }
+  
+        const objectData = {
+          ...createTransactionDto,
+          reference: createTransactionDto?.reference || `TRX-${Date.now()}`,
+          status: createTransactionDto?.status || TransactionStatus.PENDING
+        };
+  
+        // Create transaction
+        const transaction = await this.create(objectData);
+  
+        return CustomApiResponse.success({
+          message: 'Transaction created successfully',
+          status: 201,
+          data: transaction
+        });
+      } catch (error) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+  }
+
+  async handleFindOne(idOrFilter: any, user: any) {
+    try {
+      const transaction = await this.findOne(idOrFilter);
+      
+      if (!transaction) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+
+      // If not admin, ensure user can only access their own transactions
+      const wallet = await this.walletService.findByWalletId(transaction.walletId.toString());
+      const walletUserId = wallet.userId.toString();
+      const userId = user.roles.includes(UserRole.ADMIN) ? idOrFilter : user.id;
+      if (!user.roles.includes(UserRole.ADMIN) && walletUserId !== userId) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+
+      return CustomApiResponse.success({
+        message: 'Transaction retrieved successfully',
+        status: 200,
+        data: transaction
+      });
+    } catch (error) {
+      return CustomApiResponse.error({
+        message: 'Transaction not found',
+        status: 404,
+        error: 'NotFound'
+      });
+    }
+  }
+
+  async handleDelete(idOrFilter: string, user: any) {
+    try {
+      // First find the transaction to validate it exists
+      const transaction = await this.findOne(idOrFilter);
+      
+      if (!transaction) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+
+      // If not admin, ensure user can only access their own transactions
+      const wallet = await this.walletService.findByWalletId(transaction.walletId.toString());
+      const walletUserId = wallet.userId.toString();
+      const userId = user.roles.includes(UserRole.ADMIN) ? idOrFilter : user.id;
+      if (!user.roles.includes(UserRole.ADMIN) && walletUserId !== userId) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+
+      // Delete the transaction
+      const deletedTransaction = await this.delete(idOrFilter);
+      
+      if (!deletedTransaction) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+
+      return CustomApiResponse.success({
+        message: 'Transaction deleted successfully',
+        status: 200
+      });
+    } catch (error) {
+      return CustomApiResponse.error({
+        message: 'Transaction not found',
+        status: 404,
+        error: 'NotFound'
+      });
+    }
   }
 
   // Add these methods
@@ -102,7 +227,7 @@ export class TransactionsService {
     page: number = 1,
     limit: number = 10,
     userId?: string
-  ): Promise<PaginationResponse<Transaction>> {
+  ) {
     const query = userId ? { walletId: userId } : {};
     const total = await this.transactionModel.countDocuments(query);
     const transactions = await this.transactionModel
@@ -111,7 +236,7 @@ export class TransactionsService {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    return {
+    return CustomApiResponse.success({
       data: transactions,
       pagination: {
         total,
@@ -119,14 +244,14 @@ export class TransactionsService {
         limit,
         totalPages: Math.ceil(total / limit),
       }
-    };
+    });
   }
 
   async findAllUserPaginated(
     page: number = 1,
     limit: number = 10,
     userId?: string
-  ): Promise<PaginationResponse<Transaction>> {
+  ) {
     const query = userId ? { walletId: userId } : {};
     console.log("query", query);
     const total = await this.transactionModel.countDocuments(query);
@@ -136,7 +261,7 @@ export class TransactionsService {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    return {
+    return CustomApiResponse.success({
       data: transactions,
       pagination: {
         total,
@@ -144,7 +269,7 @@ export class TransactionsService {
         limit,
         totalPages: Math.ceil(total / limit),
       }
-    };
+    });
   }
 
   async verifyFunding(reference: string): Promise<VerifyTransactionResponseDto> {

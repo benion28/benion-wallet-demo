@@ -8,7 +8,6 @@ import { UserRole } from '../auth/enums/user-role.enum';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Wallet } from './schemas/wallet.schema';
-import { WalletResponse } from './dto/pagination-response.dto';
 
 @ApiTags('Wallet')
 @ApiBearerAuth()
@@ -41,9 +40,11 @@ export class WalletController {
     @Request() req,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10
-  ): Promise<WalletResponse> {
-    const response = await this.walletService.findAllAll(+page, +limit, req);
-    return response;
+  ) {
+    if (req.user.roles.includes(UserRole.ADMIN)) {
+      return await this.walletService.findAllAll(page, limit)
+    }
+    return await this.walletService.findByWalletUser(req.user.id)
   }
 
   @Post()
@@ -51,7 +52,7 @@ export class WalletController {
   async create(
     @Request() req,
     @Body() createWalletDto: CreateWalletDto
-  ): Promise<Wallet> {
+  ) {
     return this.walletService.create(createWalletDto);
   }
 
@@ -71,13 +72,13 @@ export class WalletController {
   @Get('balance')
   @ApiOperation({ summary: 'Get wallet balance' })
   async getBalance(@Request() req) {
-    return this.walletService.getBalance(req.user.userId);
+    return this.walletService.getBalance(req.user.sub.toString());
   }
 
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete wallet' })
   async delete(@Request() req, @Param('id') id: string) {
-    return this.walletService.deleteUserWallet(id, req.user.userId);
+    return this.walletService.deleteUserWallet(id, req.user.sub);
   }
 }

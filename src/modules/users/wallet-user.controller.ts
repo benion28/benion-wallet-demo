@@ -8,6 +8,7 @@ import { CreateWalletUserDto } from './dto/create-wallet-user.dto';
 import { WalletUserService } from './wallet-user.service';
 
 import { UpdateWalletUserDto } from './dto/update-wallet-user.dto';
+import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
 
 @ApiTags('Users')
 @Controller('users')
@@ -59,9 +60,17 @@ export class WalletUserController {
           error: 'NotFound'
         });
       }
-      return user;
+      return CustomApiResponse.success({
+        message: 'User retrieved successfully',
+        status: 200,
+        data: user
+      });
     } catch (error) {
-      throw error;
+      return CustomApiResponse.error({
+        message: 'User not found',
+        status: 404,
+        error: 'NotFound'
+      });
     }
   }
 
@@ -77,17 +86,27 @@ export class WalletUserController {
   ) {
     try {
       const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
-      const user = await this.walletUserService.update(userId, updateWalletUserDto);
+      const user = await this.walletUserService.findOne(userId);
+      
       if (!user) {
-        throw new NotFoundException({
-          status: HttpStatus.NOT_FOUND,
+        return CustomApiResponse.error({
           message: 'User not found',
+          status: 404,
           error: 'NotFound'
         });
       }
-      return user;
+      const updatedUser = await this.walletUserService.update(userId, updateWalletUserDto);
+      return CustomApiResponse.success({
+        message: 'User updated successfully',
+        status: 200,
+        data: updatedUser
+      });
     } catch (error) {
-      throw error;
+      return CustomApiResponse.error({
+        message: 'User not found',
+        status: 404,
+        error: 'NotFound'
+      });
     }
   }
 
@@ -96,12 +115,31 @@ export class WalletUserController {
   @ApiOperation({ summary: 'Delete user' })
   @SwaggerResponse({ status: 200, description: 'User deleted successfully' })
   @SwaggerResponse({ status: 404, description: 'User not found' })
-  async remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @Request() req: any) {
     try {
-      await this.walletUserService.remove(id);
-      return null;
+      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
+      const user = await this.walletUserService.findOne(userId);
+
+      if (!user) {
+        return CustomApiResponse.error({
+          message: 'User not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+      
+      await this.walletUserService.remove(userId);
+      return CustomApiResponse.success({
+        message: 'User deleted successfully',
+        status: 200,
+        data: null
+      });
     } catch (error) {
-      throw error;
+      return CustomApiResponse.error({
+        message: 'User not found',
+        status: 404,
+        error: 'NotFound'
+      });
     }
   }
 }

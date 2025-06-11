@@ -1,5 +1,5 @@
 // src/modules/transactions/dto/create-transaction.dto.ts
-import { IsNumber, IsString, IsEnum, IsPositive } from 'class-validator';
+import { IsNumber, IsString, IsEnum, IsPositive, IsOptional } from 'class-validator';
 import { TransactionStatus, TransactionType } from '../enums/transaction-type.enum';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -23,9 +23,11 @@ export class CreateTransactionDto {
 
   @ApiProperty({ description: 'Transaction status', example: 'pending' })
   @IsEnum(TransactionStatus)
-  status: TransactionStatus;
+  @IsOptional()
+  status?: TransactionStatus | null;
 
-  @ApiProperty({ description: 'Unique transaction reference', example: 'TXN-123456' })
+  @ApiProperty({ description: 'Unique transaction reference', example: 'TXN-123456', required: false })
   @IsString()
-  reference: string;
+  @IsOptional()
+  reference?: string;
 }

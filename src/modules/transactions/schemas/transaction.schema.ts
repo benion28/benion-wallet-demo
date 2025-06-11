@@ -15,11 +15,11 @@ export class Transaction extends Document {
   type: TransactionType;
 
   @Prop({ 
-    required: true, 
+    required: false, 
     enum: Object.values(TransactionStatus),
     type: String
   })
-  status: TransactionStatus;
+  status?: TransactionStatus;
 
   @Prop({ required: true, type: Number })
   amount: number;
@@ -27,7 +27,7 @@ export class Transaction extends Document {
   @Prop({ required: true, type: String })
   description: string;
 
-  @Prop({ type: String })
+  @Prop({ type: String, required: false })
   reference?: string;
 
   @Prop({ type: Object })

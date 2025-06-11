@@ -4,12 +4,13 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { WalletUserService } from '../../users/wallet-user.service';
+import { UserRole } from '../enums/user-role.enum';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private readonly configService: ConfigService,
-    private readonly walletUserService: WalletUserService, // Changed from usersService to walletUserService
+    private readonly walletUserService: WalletUserService
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -23,10 +24,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnauthorizedException();
     }
+    const userData = user.toObject();
     return {
-      id: user._id,
-      email: user.email,
-      roles: user.roles,
+      _id: userData._id.toString(),
+      email: userData.email,
+      roles: userData.roles || [UserRole.USER]
     };
   }
 }
