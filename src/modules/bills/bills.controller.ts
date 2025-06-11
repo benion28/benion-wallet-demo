@@ -1,9 +1,9 @@
 import { Controller, Post, Body, Get, Param, UseGuards, Request } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiBody, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BillsService } from './bills.service';
-import { CreateBillDto } from '@/modules/bills/dto/create-bill.dto';
-import { BillResponseDto } from '@/modules/bills/dto/bill-response.dto';
+import { CreateBillDto } from './dto/create-bill.dto';
+import { BillResponseDto } from './dto/bill-response.dto';
 
 @ApiTags('Bills')
 @ApiBearerAuth()
@@ -13,11 +13,37 @@ export class BillsController {
 
   @Post('pay')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Process a bill payment' })
-  @ApiResponse({ status: 200, description: 'Payment processed successfully', type: BillResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid payment data' })
-  @ApiResponse({ status: 404, description: 'Wallet not found' })
-  @ApiResponse({ status: 500, description: 'Payment processing failed' })
+  @ApiOperation({
+    summary: 'Process a bill payment',
+    description: 'Initiate and process a bill payment using the wallet'
+  })
+  @ApiBody({
+    type: CreateBillDto,
+    schema: {
+      properties: {
+        billId: {
+          type: 'string',
+          description: 'ID of the bill to be paid',
+          example: '64f123456789abcdef123456'
+        },
+        amount: {
+          type: 'number',
+          description: 'Amount to be paid',
+          example: 100.00
+        },
+        reference: {
+          type: 'string',
+          description: 'Transaction reference',
+          example: 'BILL-123456'
+        },
+        description: {
+          type: 'string',
+          description: 'Payment description',
+          example: 'Electricity bill payment'
+        }
+      }
+    }
+  })
   async pay(
     @Request() req,
     @Body() createBillDto: CreateBillDto
@@ -27,9 +53,17 @@ export class BillsController {
 
   @Get('status/:transactionId')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Check bill payment status' })
-  @ApiResponse({ status: 200, description: 'Payment status retrieved', type: BillResponseDto })
-  @ApiResponse({ status: 404, description: 'Transaction not found' })
+  @ApiOperation({
+    summary: 'Check bill payment status',
+    description: 'Retrieve the status of a bill payment transaction'
+  })
+  @ApiParam({
+    name: 'transactionId',
+    type: 'string',
+    description: 'ID of the transaction to check',
+    required: true,
+    example: '64f123456789abcdef123456'
+  })
   async getPaymentStatus(
     @Param('transactionId') transactionId: string,
     @Request() req

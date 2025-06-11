@@ -4,53 +4,35 @@ import { TransactionStatus, TransactionType } from '../enums/transaction-type.en
 
 @Schema({ timestamps: true })
 export class Transaction extends Document {
-  @Prop({ 
-    type: MongooseSchema.Types.ObjectId, 
-    ref: 'Wallet', 
-    required: true 
-  })
-  walletId: Types.ObjectId;
+  @Prop({ required: true, type: String })
+  walletId: string;
 
   @Prop({ 
-    type: String, 
     required: true, 
-    enum: Object.values(TransactionType)
+    enum: Object.values(TransactionType),
+    type: String
   })
   type: TransactionType;
 
   @Prop({ 
-    type: Number, 
     required: true, 
-    min: 0.01 
-  })
-  amount: number;
-
-  @Prop({ 
-    type: String, 
-    required: true 
-  })
-  description: string;
-
-  @Prop({ 
-    type: String, 
-    required: true, 
-    enum: Object.values(TransactionStatus)
+    enum: Object.values(TransactionStatus),
+    type: String
   })
   status: TransactionStatus;
 
-  @Prop({ 
-    type: String, 
-    unique: true, 
-    required: false 
-  })
-  reference: string;
+  @Prop({ required: true, type: Number })
+  amount: number;
 
-  @Prop({ 
-    type: Object 
-  })
+  @Prop({ required: true, type: String })
+  description: string;
+
+  @Prop({ type: String })
+  reference?: string;
+
+  @Prop({ type: Object })
   metadata?: Record<string, any>;
 
-  // Explicitly define timestamps
   @Prop({ type: Date, default: Date.now })
   createdAt: Date;
 

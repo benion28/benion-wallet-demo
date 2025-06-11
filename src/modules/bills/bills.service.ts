@@ -1,19 +1,12 @@
-import { Inject, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, Logger, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PaymentGateway } from '../../common/interfaces/payment-gateway.interface';
-// Using string literals for status since transactions service uses them
-// Using string literals for status since transactions service uses them
-// Using string literals for status since transactions service uses them
-// Using string literals for status since transactions service uses them
-// Using string literals for status since transactions service uses them
-// Using string literals for status since transactions service uses them
-import { Transaction } from '@/modules/transactions/schemas/transaction.schema';
-import { WalletService } from '@/modules/wallet/wallet.service';
-import { TransactionsService } from '@/modules/transactions/transactions.service';
-import { CreateBillDto } from '@/modules/bills/dto/create-bill.dto';
-import { BillResponseDto } from '@/modules/bills/dto/bill-response.dto';
-import { UserRole } from '../../common/enums/user-role.enum';
+import { Transaction } from '../transactions/models/transaction.model';
+import { WalletService } from '../wallet/wallet.service';
+import { TransactionsService } from '../transactions/transactions.service';
+import { CreateBillDto } from './dto/create-bill.dto';
+import { BillResponseDto } from './dto/bill-response.dto';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventPattern, Ctx } from '@nestjs/microservices';
@@ -24,13 +17,11 @@ export class BillsService {
   private readonly logger = new Logger(BillsService.name);
 
   constructor(
-    @Inject('PAYMENT_GATEWAY')
-    private readonly paymentGateway: PaymentGateway,
-    @InjectModel(Transaction.name)
-    private readonly transactionModel: Model<Transaction>,
-    private readonly walletService: WalletService,
-    private readonly transactionsService: TransactionsService,
-    private readonly eventEmitter: EventEmitter2
+    @Inject('PAYMENT_GATEWAY') private readonly paymentGateway: PaymentGateway,
+    @Inject(forwardRef(() => WalletService)) private readonly walletService: WalletService,
+    @Inject(forwardRef(() => TransactionsService)) private readonly transactionsService: TransactionsService,
+    @Inject(forwardRef(() => EventEmitter2)) private readonly eventEmitter: EventEmitter2,
+    @InjectModel('Transaction') private readonly transactionModel: Model<Transaction>
   ) {
     this.logger.log('BillsService initialized');
   }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, HttpStatus, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, HttpStatus, Request, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse as SwaggerResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -6,7 +6,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/enums/user-role.enum';
 import { CreateWalletUserDto } from './dto/create-wallet-user.dto';
 import { WalletUserService } from './wallet-user.service';
-import { ApiResponse } from '../../common/utils/api-response.util';
+
 import { UpdateWalletUserDto } from './dto/update-wallet-user.dto';
 
 @ApiTags('Users')
@@ -24,17 +24,9 @@ export class WalletUserController {
   async create(@Body() createWalletUserDto: CreateWalletUserDto) {
     try {
       const user = await this.walletUserService.create(createWalletUserDto);
-      return ApiResponse.success({
-        status: HttpStatus.CREATED,
-        message: 'User created successfully',
-        data: user
-      });
+      return user;
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || HttpStatus.BAD_REQUEST,
-        message: error.message || 'Failed to create user',
-        error: error.name || 'BadRequest'
-      });
+      throw error;
     }
   }
 
@@ -45,17 +37,9 @@ export class WalletUserController {
   async findAll() {
     try {
       const users = await this.walletUserService.findAll();
-      return ApiResponse.success({
-        status: HttpStatus.OK,
-        message: 'Users retrieved successfully',
-        data: users
-      });
+      return users;
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-        message: error.message || 'Failed to retrieve users',
-        error: error.name || 'InternalServerError'
-      });
+      throw error;
     }
   }
 
@@ -69,23 +53,15 @@ export class WalletUserController {
       const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
       const user = await this.walletUserService.findOne(userId);
       if (!user) {
-        return ApiResponse.error({
+        throw new NotFoundException({
           status: HttpStatus.NOT_FOUND,
           message: 'User not found',
           error: 'NotFound'
         });
       }
-      return ApiResponse.success({
-        status: HttpStatus.OK,
-        message: 'User retrieved successfully',
-        data: user
-      });
+      return user;
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-        message: error.message || 'Failed to retrieve user',
-        error: error.name || 'InternalServerError'
-      });
+      throw error;
     }
   }
 
@@ -103,23 +79,15 @@ export class WalletUserController {
       const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
       const user = await this.walletUserService.update(userId, updateWalletUserDto);
       if (!user) {
-        return ApiResponse.error({
+        throw new NotFoundException({
           status: HttpStatus.NOT_FOUND,
           message: 'User not found',
           error: 'NotFound'
         });
       }
-      return ApiResponse.success({
-        status: HttpStatus.OK,
-        message: 'User updated successfully',
-        data: user
-      });
+      return user;
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-        message: error.message || 'Failed to update user',
-        error: error.name || 'InternalServerError'
-      });
+      throw error;
     }
   }
 
@@ -131,17 +99,9 @@ export class WalletUserController {
   async remove(@Param('id') id: string) {
     try {
       await this.walletUserService.remove(id);
-      return ApiResponse.success({
-        status: 200,
-        message: 'User deleted successfully',
-        data: null,
-      });
+      return null;
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || 500,
-        message: error.message || 'Failed to delete user',
-        error: error.name,
-      });
+      throw error;
     }
   }
 }

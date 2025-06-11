@@ -1,17 +1,18 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Document } from 'mongoose';
+import { Model } from 'mongoose';
 import { Transaction } from './schemas/transaction.schema';
 import { VerifyTransactionResponseDto } from './dto/verify-transaction.response.dto';
 import { WalletService } from '../wallet/wallet.service';
 import { forwardRef } from '@nestjs/common';
-import { ApiResponse } from '../../common/utils/api-response.util';
+import { PaginationResponse } from './dto/pagination-response.dto';
+
 import { Wallet } from '../wallet/schemas/wallet.schema';
 
 @Injectable()
 export class TransactionsService {
   constructor(
-    @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
+    @InjectModel('Transaction') private transactionModel: Model<Transaction>,
     @Inject(forwardRef(() => WalletService))
     private readonly walletService: WalletService
   ) {}
@@ -32,11 +33,7 @@ export class TransactionsService {
   async findByWalletId(userId: string) {
     const wallet = await this.walletService.findByWalletUser(userId);
     if (!wallet) {
-      return ApiResponse.error({
-        status: 404,
-        message: 'User Wallet not found',
-        error: 'User Wallet not found'
-      });
+      throw new NotFoundException('User Wallet not found');
     }
     return wallet;
   }
@@ -62,37 +59,21 @@ export class TransactionsService {
       const wallet = await this.findByWalletId(userId);
       
       if (!wallet) {
-        return ApiResponse.error({
-          status: 404,
-          message: 'Wallet not found',
-          error: 'Wallet not found'
-        });
+        throw new NotFoundException('Wallet not found');
       }
       
       // Then find transactions for this wallet
-      const walletDoc = wallet as Document & Wallet;
+      const walletDoc = wallet as unknown as Document & Wallet;
       const transactions = await this.transactionModel.find({ walletId: walletDoc._id });
   
-      if (!transactions) {
-        return ApiResponse.success({
-          status: 200,
-          message: 'No transactions found',
-          data: []
-        });
+      if (!transactions.length) {
+        return [];
       }
   
-      return ApiResponse.success({
-        status: 200,
-        message: 'Transactions retrieved successfully',
-        data: transactions
-      });
+      return transactions;
     } catch (error) {
       console.error('Error finding transactions:', error);
-      return ApiResponse.error({
-        status: error.status || 500,
-        message: error.message || 'Failed to retrieve transactions',
-        error: error.name
-      });
+      throw new InternalServerErrorException('Failed to retrieve transactions');
     }
   }
 
@@ -107,11 +88,13 @@ export class TransactionsService {
   }
 
   async findAll() {
-    return ApiResponse.success({
-      status: 200,
-      message: 'Transactions retrieved successfully',
-      data: this.transactionModel.find().sort({ createdAt: -1 })
-    });
+    try {
+      const transactions = await this.transactionModel.find().sort({ createdAt: -1 }).exec();
+      return transactions;
+    } catch (error) {
+      console.error('Error finding all transactions:', error);
+      throw new InternalServerErrorException('Failed to retrieve transactions');
+    }
   }
 
   // Add pagination method if needed
@@ -119,7 +102,7 @@ export class TransactionsService {
     page: number = 1,
     limit: number = 10,
     userId?: string
-  ) {
+  ): Promise<PaginationResponse<Transaction>> {
     const query = userId ? { walletId: userId } : {};
     const total = await this.transactionModel.countDocuments(query);
     const transactions = await this.transactionModel
@@ -128,9 +111,7 @@ export class TransactionsService {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    return ApiResponse.success({
-      status: 200,
-      message: 'Transactions retrieved successfully',
+    return {
       data: transactions,
       pagination: {
         total,
@@ -138,14 +119,14 @@ export class TransactionsService {
         limit,
         totalPages: Math.ceil(total / limit),
       }
-    });
+    };
   }
 
   async findAllUserPaginated(
     page: number = 1,
     limit: number = 10,
     userId?: string
-  ) {
+  ): Promise<PaginationResponse<Transaction>> {
     const query = userId ? { walletId: userId } : {};
     console.log("query", query);
     const total = await this.transactionModel.countDocuments(query);
@@ -155,9 +136,7 @@ export class TransactionsService {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    return ApiResponse.success({
-      status: 200,
-      message: 'Transactions retrieved successfully',
+    return {
       data: transactions,
       pagination: {
         total,
@@ -165,7 +144,7 @@ export class TransactionsService {
         limit,
         totalPages: Math.ceil(total / limit),
       }
-    });
+    };
   }
 
   async verifyFunding(reference: string): Promise<VerifyTransactionResponseDto> {

@@ -8,9 +8,7 @@ import { BillsService } from '../bills/bills.service';
 import { CreateWalletDto } from './dto/create-wallet.dto';
 import { TransactionStatus } from '../transactions/enums/transaction-type.enum';
 import { FundWalletDto } from './dto/fund-wallet.dto';
-import { ApiResponse } from '../../common/utils/api-response.util';
-import { UserRole } from '../../common/enums/user-role.enum';
-
+import { WalletPaginationResponse } from './dto/pagination-response.dto';
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
@@ -103,11 +101,7 @@ export class WalletService {
       }).exec();
 
       if (existingWallet) {
-        return ApiResponse.error({
-          status: 409,
-          message: 'User already has a wallet',
-          error: 'User already has a wallet'
-        });
+        throw new ConflictException('User already has a wallet');
       }
 
       // Set default values if not provided
@@ -125,17 +119,9 @@ export class WalletService {
       this.logger.error(`Error creating wallet: ${error.message}`, error.stack);
       // If it's a duplicate key error (MongoDB error code 11000)
       if (error.code === 11000) {
-        return ApiResponse.error({
-          status: 409,
-          message: 'User already has a wallet',
-          error: 'User already has a wallet'
-        });
+        throw new ConflictException('User already has a wallet');
       }
-      return ApiResponse.error({
-        status: error.status || 500,
-        message: error.message,
-        error: error.name
-      });
+      throw error; // Let NestJS handle other errors
     }
   }
 
@@ -149,11 +135,8 @@ export class WalletService {
         }
         return wallet;
       } catch (error) {
-        return ApiResponse.error({
-          status: error.status || 500,
-          message: error.message,
-          error: error.name
-        });
+        this.logger.error(`Error in getOrCreateWallet: ${error.message}`, error.stack);
+        throw error;
       }
     }
 
@@ -161,11 +144,7 @@ export class WalletService {
     try {
       const wallet = await this.walletModel.findOne({ userId }).exec();
       if (!wallet) {
-        return ApiResponse.error({
-          status: 404,
-          message: 'Wallet not found',
-          error: 'Wallet not found'
-        });
+        throw new NotFoundException('Wallet not found');
       }
   
       // Create transaction with pending status
@@ -186,11 +165,7 @@ export class WalletService {
       );
   
       if (!updatedWallet) {
-        return ApiResponse.error({
-          status: 500,
-          message: 'Failed to update wallet balance',
-          error: 'Failed to update wallet balance'
-        });
+        throw new HttpException('Failed to update wallet balance', HttpStatus.INTERNAL_SERVER_ERROR);
       }
   
       // Only update transaction status if balance update was successful
@@ -207,22 +182,14 @@ export class WalletService {
       if (error instanceof Error) {
         await this.transactionsService.updateStatus(fundDto.reference, TransactionStatus.FAILED);
       }
-      return ApiResponse.error({
-        status: error.status || 500,
-        message: error.message,
-        error: error.name
-      });
+      throw error; // Let NestJS handle the error
     }
   }
 
   async verifyFunding(reference: string) {
     const transaction = await this.transactionsService.findOne({ reference });
     if (!transaction) {
-      return ApiResponse.error({
-        status: 404,
-        message: 'Transaction not found',
-        error: 'Transaction not found'
-      });
+      throw new NotFoundException('Transaction not found');
     }
 
     return {
@@ -236,16 +203,16 @@ export class WalletService {
   async getBalance(userId: string) {
     const wallet = await this.walletModel.findOne({ userId }).exec();
     if (!wallet) {
-      return ApiResponse.error({
+      return {
         status: 404,
         message: 'Wallet not found',
         error: 'Wallet not found'
-      });
+      };
     }
     return wallet.balance;
   }
 
-  async findAllAll(page: number, limit: number, req: any) {
+  async findAllAll(page: number, limit: number, req: any): Promise<WalletPaginationResponse> {
     try {
       const skip = (page - 1) * limit;
       
@@ -265,11 +232,7 @@ export class WalletService {
         totalPages: Math.ceil(total / limit)
       };
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || 500,
-        message: error.message,
-        error: error.name
-      });
+      throw new HttpException(error.message, error.status || HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -293,22 +256,22 @@ export class WalletService {
         totalPages: Math.ceil(total / limit)
       };
     } catch (error) {
-      return ApiResponse.error({
+      return {
         status: error.status || 500,
         message: error.message,
         error: error.name
-      });
+      };
     }
   }
 
   async deleteUserWallet(userId: string, req: any) {
     const wallet = await this.walletModel.findOneAndDelete({ userId });
     if (!wallet) {
-      return ApiResponse.error({
+      return {
         status: 404,
         message: 'Wallet not found',
         error: 'Wallet not found'
-      });
+      };
     }
     return null;
   }
@@ -316,11 +279,11 @@ export class WalletService {
   async deleteWallet(req: any) {
     const wallet = await this.walletModel.findOneAndDelete({ userId: req.user.sub });
     if (!wallet) {
-      return ApiResponse.error({
+      return {
         status: 404,
         message: 'Wallet not found',
         error: 'Wallet not found'
-      });
+      };
     }
     return null;
   }

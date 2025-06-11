@@ -1,11 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { WalletUserService } from '../users/wallet-user.service';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { CreateWalletUserDto } from '../users/dto/create-wallet-user.dto';
 import { UserRole } from './enums/user-role.enum';
-import { ApiResponse } from '../../common/utils/api-response.util';
+
 import { WalletService } from '../wallet/wallet.service';
 
 @Injectable()
@@ -59,18 +59,10 @@ export class AuthService {
         }
       };
 
-      return ApiResponse.success({
-        status: 200,
-        message: 'Login successful',
-        data: tokenData
-      });
+      return tokenData;
     } catch (error) {
       console.error('Login error:', error);
-      return ApiResponse.error({
-        status: 401,
-        message: 'Login failed: ' + error.message,
-        error: 'Unauthorized'
-      });
+      throw new UnauthorizedException('Login failed: ' + error.message);
     }
   }
 
@@ -95,21 +87,13 @@ export class AuthService {
       // Create wallet for the new user
       await this.walletService.getOrCreateWallet(savedUser._id.toString());
       
-      return ApiResponse.success({
-        status: 201,
-        message: 'User registered successfully',
-        data: {
-          ...savedUser,
-          password: rawPassword
-        }
-      });
+      return {
+        ...savedUser,
+        password: rawPassword
+      };
     } catch (error) {
       console.error('Registration error:', error);
-      return ApiResponse.error({
-        status: 400,
-        message: 'Registration failed: ' + error.message,
-        error: error.name || 'BadRequest'
-      });
+      throw new BadRequestException('Registration failed: ' + error.message);
     }
   }
 }
