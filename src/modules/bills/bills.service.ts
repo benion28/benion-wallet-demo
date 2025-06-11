@@ -49,15 +49,25 @@ export class BillsService {
       }
 
       // 3. Create pending transaction
-      const transaction = await this.transactionsService.create({
-        userId,
-        amount: createBillDto.amount,
+      const transactionData = {
+        walletId: wallet._id.toString(),
         type: TransactionType.BILL_PAYMENT,
+        amount: createBillDto.amount,
         status: TransactionStatus.PENDING,
-        reference: createBillDto?.billReference ? `${createBillDto.billReference}-${Date.now()}` : `TRX-${Date.now()}`,
-        description : createBillDto?.description || 'Bill Payment',
-        walletId: wallet._id.toString()
-      });
+        description: createBillDto.description || `Bill payment to ${createBillDto.provider}`,
+        reference: createBillDto.billReference || `BILL-${Date.now()}`,
+        metadata: {
+          provider: createBillDto.provider,
+          ...(createBillDto.metadata && { 
+            ...(typeof createBillDto.metadata === 'string' 
+              ? JSON.parse(createBillDto.metadata) 
+              : createBillDto.metadata
+            )
+          })
+        }
+      };
+      
+      const transaction = await this.transactionsService.create(transactionData);
 
       // 4. Deduct amount from wallet
       await this.walletService.deductAmount(userId, createBillDto.amount, transaction._id.toString());
@@ -132,24 +142,47 @@ export class BillsService {
     }
   }
 
-  async getPaymentStatus(transactionId: string, userId: string): Promise<BillResponseDto> {
-    const transaction = await this.transactionModel
+  async getPaymentStatus(transactionId: string, userId: string) {
+    try {
+      const transaction = await this.transactionModel
       .findById(transactionId)
       .where('userId', userId)
       .exec();
 
     if (!transaction) {
-      throw new NotFoundException('Transaction not found');
+      return CustomApiResponse.error({
+        status: 404,
+        message: 'Transaction not found',
+        error: 'Transaction not found'
+      });
     }
 
-    return {
-      transactionId,
-      status: transaction.status,
-      amount: transaction.amount,
-      billReference: transaction.metadata.billReference,
-      provider: transaction.metadata.provider,
-      message: transaction.metadata.message
-    } as BillResponseDto;
+    if (transaction.type !== TransactionType.BILL_PAYMENT) {
+      return CustomApiResponse.error({
+        status: 400,
+        message: 'Bill Transaction not found',
+        error: 'Bill Transaction not found'
+      });
+    }
+
+    return CustomApiResponse.success({
+      status: 200,
+      message: 'Transaction found',
+      data: {
+        transactionId,
+        status: transaction.status,
+        amount: transaction.amount,
+        billReference: transaction.metadata.billReference,
+        provider: transaction.metadata.provider,
+        message: transaction.metadata.message
+      }
+    });
+    } catch (error) {
+      return CustomApiResponse.error({
+        status: 500,
+        error: error.message || 'Failed to get transaction status'
+      });
+    }
   }
 
   private async handlePaymentFailure(userId: string, error: Error): Promise<void> {

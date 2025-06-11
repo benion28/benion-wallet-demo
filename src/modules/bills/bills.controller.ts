@@ -67,7 +67,7 @@ export class BillsController {
   async getPaymentStatus(
     @Param('transactionId') transactionId: string,
     @Request() req
-  ): Promise<BillResponseDto> {
+  ) {
     return this.billsService.getPaymentStatus(transactionId, req.user.userId);
   }
 }

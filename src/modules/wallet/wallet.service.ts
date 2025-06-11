@@ -43,23 +43,37 @@ export class WalletService {
 
   async deductAmount(userId: string, amount: number, transactionId: string): Promise<void> {
     try {
-      const wallet = await this.walletModel.findOneAndUpdate(
-        { userId },
-        { $inc: { balance: -amount } },
-        { new: true }
-      ).exec();
-
+      // First find the wallet to get its ID
+      const wallet = await this.walletModel.findOne({ userId }).exec();
+      
       if (!wallet) {
         throw new NotFoundException('Wallet not found');
       }
 
-      // Create transaction record
+      // Update the wallet balance
+      const updatedWallet = await this.walletModel.findByIdAndUpdate(
+        wallet._id,
+        { $inc: { balance: -amount } },
+        { new: true }
+      ).exec();
+
+      if (!updatedWallet) {
+        throw new NotFoundException('Failed to update wallet');
+      }
+
+      // Create transaction record with walletId
       await this.transactionsService.create({
+        walletId: wallet._id.toString(),
         userId,
         amount,
         status: 'pending',
         type: 'debit',
-        metadata: { transactionId }
+        description: 'Amount deduction',
+        reference: `DEDUCT-${Date.now()}`,
+        metadata: { 
+          transactionId,
+          originalTransactionId: transactionId
+        }
       });
 
     } catch (error) {
@@ -70,23 +84,37 @@ export class WalletService {
 
   async addAmount(userId: string, amount: number, transactionId: string): Promise<void> {
     try {
-      const wallet = await this.walletModel.findOneAndUpdate(
-        { userId },
-        { $inc: { balance: amount } },
-        { new: true }
-      ).exec();
-
+      // First find the wallet to get its ID
+      const wallet = await this.walletModel.findOne({ userId }).exec();
+      
       if (!wallet) {
         throw new NotFoundException('Wallet not found');
       }
 
-      // Create transaction record
+      // Update the wallet balance
+      const updatedWallet = await this.walletModel.findByIdAndUpdate(
+        wallet._id,
+        { $inc: { balance: amount } },
+        { new: true }
+      ).exec();
+
+      if (!updatedWallet) {
+        throw new NotFoundException('Failed to update wallet');
+      }
+
+      // Create transaction record with walletId
       await this.transactionsService.create({
+        walletId: wallet._id.toString(),
         userId,
         amount,
         status: 'success',
         type: 'credit',
-        metadata: { transactionId }
+        description: 'Amount added',
+        reference: `CREDIT-${Date.now()}`,
+        metadata: { 
+          transactionId,
+          originalTransactionId: transactionId
+        }
       });
 
     } catch (error) {

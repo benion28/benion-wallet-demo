@@ -2,7 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { PaymentGateway, PaymentInitResponse, PaymentVerificationResponse, Bank, AccountDetails } from '../interfaces/payment-gateway.interface';
+import { 
+  PaymentGateway, 
+  PaymentInitResponse, 
+  PaymentVerificationResponse, 
+  Bank, 
+  AccountDetails,
+  PaymentStatus 
+} from '../interfaces/payment-gateway.interface';
 
 @Injectable()
 export class PaystackGateway implements PaymentGateway {
@@ -84,9 +91,37 @@ export class PaystackGateway implements PaymentGateway {
           amount: 0,
           currency: 'NGN',
           transactionDate: new Date(),
-          status: 'failed',
+          status: PaymentStatus.FAILED,
           reference,
         },
+      };
+    }
+  }
+
+  async processBillPayment(data: any): Promise<any> {
+    try {
+      // This is a mock implementation since Paystack doesn't have a direct bill payment endpoint
+      // In a real implementation, you would call the appropriate Paystack API endpoint for bill payments
+      console.log('Processing bill payment with data:', data);
+      
+      // Simulate a successful payment
+      return {
+        success: true,
+        message: 'Bill payment processed successfully',
+        data: {
+          transactionId: `BILL-${Date.now()}`,
+          status: PaymentStatus.SUCCESS,
+          provider: data.provider,
+          billReference: data.billReference,
+          amount: data.amount
+        }
+      };
+    } catch (error) {
+      console.error('Error processing bill payment:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to process bill payment',
+        data: null
       };
     }
   }
