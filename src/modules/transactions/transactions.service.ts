@@ -9,7 +9,7 @@ import { PaginationResponse } from './dto/pagination-response.dto';
 
 import { Wallet } from '../wallet/schemas/wallet.schema';
 import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
-import { TransactionStatus } from './enums/transaction-type.enum';
+import { TransactionStatus, TransactionType } from './enums/transaction-type.enum';
 import { UserRole } from '../auth/enums/user-role.enum';
 
 @Injectable()
@@ -51,13 +51,36 @@ export class TransactionsService {
 
   // Add this method for creating transactions
   async create(createTransactionDto: any) {
-    const transaction = new this.transactionModel(createTransactionDto);
-    return transaction.save();
+    try {
+      // Ensure required fields are present
+      const transactionData = {
+        ...createTransactionDto,
+        status: createTransactionDto.status || TransactionStatus.PENDING,
+        reference: createTransactionDto.reference || `TRX-${Date.now()}`,
+        description: createTransactionDto.description || 'Transaction',
+        type: createTransactionDto.type || TransactionType.MANUAL,
+        walletId: createTransactionDto.walletId || null,
+        amount: createTransactionDto.amount || 0,
+        metadata: createTransactionDto.metadata || {}
+      };
+
+      // Log the data being saved for debugging
+      console.log('Creating transaction with data:', JSON.stringify(transactionData, null, 2));
+
+      const transaction = new this.transactionModel(transactionData);
+      const savedTransaction = await transaction.save();
+      
+      return savedTransaction;
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      throw error;
+    }
   }
 
   async handleCreate(createTransactionDto: any) {
     try {
-        // Validate wallet exists
+      // Validate wallet exists if walletId is provided
+      if (createTransactionDto.walletId) {
         const wallet = await this.walletService.findByWalletId(createTransactionDto.walletId);
         if (!wallet) {
           return CustomApiResponse.error({
@@ -66,28 +89,36 @@ export class TransactionsService {
             error: 'Wallet does not exist'
           });
         }
-  
-        const objectData = {
-          ...createTransactionDto,
-          reference: createTransactionDto?.reference || `TRX-${Date.now()}`,
-          status: createTransactionDto?.status || TransactionStatus.PENDING
-        };
-  
-        // Create transaction
-        const transaction = await this.create(objectData);
-  
-        return CustomApiResponse.success({
-          message: 'Transaction created successfully',
-          status: 201,
-          data: transaction
-        });
-      } catch (error) {
-        return CustomApiResponse.error({
-          message: 'Transaction not found',
-          status: 404,
-          error: 'NotFound'
-        });
       }
+
+      // Format the transaction data
+      const transactionData = {
+        ...createTransactionDto,
+        status: createTransactionDto.status || TransactionStatus.PENDING,
+        reference: createTransactionDto.reference || `TRX-${Date.now()}`,
+        description: createTransactionDto.description || 'Transaction',
+        type: createTransactionDto.type || TransactionType.MANUAL,
+        walletId: createTransactionDto.walletId,
+        amount: createTransactionDto.amount || 0,
+        metadata: createTransactionDto.metadata || {}
+      };
+
+      // Create transaction
+      const transaction = await this.create(transactionData);
+
+      return CustomApiResponse.success({
+        message: 'Transaction created successfully',
+        status: 201,
+        data: transaction
+      });
+    } catch (error) {
+      console.error('Error in handleCreate:', error);
+      return CustomApiResponse.error({
+        message: 'Failed to create transaction',
+        status: 500,
+        error: error.message || 'Internal server error'
+      });
+    }
   }
 
   async handleFindOne(idOrFilter: any, user: any) {

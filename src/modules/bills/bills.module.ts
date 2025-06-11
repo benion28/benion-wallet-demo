@@ -20,13 +20,7 @@ import { TransactionsModule } from '../transactions/transactions.module';
     EventEmitterModule.forRoot()
   ],
   controllers: [BillsController],
-  providers: [
-    BillsService,
-    {
-      provide: 'PAYMENT_GATEWAY',
-      useValue: {} // Replace with actual payment gateway implementation
-    }
-  ],
+  providers: [BillsService],
   exports: [
     BillsService
   ]

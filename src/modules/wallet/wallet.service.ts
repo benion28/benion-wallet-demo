@@ -10,6 +10,7 @@ import { TransactionStatus } from '../transactions/enums/transaction-type.enum';
 import { FundWalletDto } from './dto/fund-wallet.dto';
 import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
 import { UserRole } from '../auth/enums/user-role.enum';
+import { error } from 'console';
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
@@ -42,23 +43,37 @@ export class WalletService {
 
   async deductAmount(userId: string, amount: number, transactionId: string): Promise<void> {
     try {
-      const wallet = await this.walletModel.findOneAndUpdate(
-        { userId },
-        { $inc: { balance: -amount } },
-        { new: true }
-      ).exec();
-
+      // First find the wallet to get its ID
+      const wallet = await this.walletModel.findOne({ userId }).exec();
+      
       if (!wallet) {
         throw new NotFoundException('Wallet not found');
       }
 
-      // Create transaction record
+      // Update the wallet balance
+      const updatedWallet = await this.walletModel.findByIdAndUpdate(
+        wallet._id,
+        { $inc: { balance: -amount } },
+        { new: true }
+      ).exec();
+
+      if (!updatedWallet) {
+        throw new NotFoundException('Failed to update wallet');
+      }
+
+      // Create transaction record with walletId
       await this.transactionsService.create({
+        walletId: wallet._id.toString(),
         userId,
         amount,
         status: 'pending',
         type: 'debit',
-        metadata: { transactionId }
+        description: 'Amount deduction',
+        reference: `DEDUCT-${Date.now()}`,
+        metadata: { 
+          transactionId,
+          originalTransactionId: transactionId
+        }
       });
 
     } catch (error) {
@@ -69,23 +84,37 @@ export class WalletService {
 
   async addAmount(userId: string, amount: number, transactionId: string): Promise<void> {
     try {
-      const wallet = await this.walletModel.findOneAndUpdate(
-        { userId },
-        { $inc: { balance: amount } },
-        { new: true }
-      ).exec();
-
+      // First find the wallet to get its ID
+      const wallet = await this.walletModel.findOne({ userId }).exec();
+      
       if (!wallet) {
         throw new NotFoundException('Wallet not found');
       }
 
-      // Create transaction record
+      // Update the wallet balance
+      const updatedWallet = await this.walletModel.findByIdAndUpdate(
+        wallet._id,
+        { $inc: { balance: amount } },
+        { new: true }
+      ).exec();
+
+      if (!updatedWallet) {
+        throw new NotFoundException('Failed to update wallet');
+      }
+
+      // Create transaction record with walletId
       await this.transactionsService.create({
+        walletId: wallet._id.toString(),
         userId,
         amount,
         status: 'success',
         type: 'credit',
-        metadata: { transactionId }
+        description: 'Amount added',
+        reference: `CREDIT-${Date.now()}`,
+        metadata: { 
+          transactionId,
+          originalTransactionId: transactionId
+        }
       });
 
     } catch (error) {
@@ -177,7 +206,10 @@ export class WalletService {
       );
   
       if (!updatedWallet) {
-        throw new HttpException('Failed to update wallet balance', HttpStatus.INTERNAL_SERVER_ERROR);
+        return CustomApiResponse.error({
+          status: 404,
+          error: 'Wallet not found'
+        });
       }
   
       // Only update transaction status if balance update was successful
@@ -194,7 +226,10 @@ export class WalletService {
       if (error instanceof Error) {
         await this.transactionsService.updateStatus(fundDto.reference, TransactionStatus.FAILED);
       }
-      throw error; // Let NestJS handle the error
+      return CustomApiResponse.error({
+        status: 500,
+        error: error.message || 'Internal Server Error'
+      });
     }
   }
 

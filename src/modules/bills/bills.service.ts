@@ -10,7 +10,8 @@ import { BillResponseDto } from './dto/bill-response.dto';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventPattern, Ctx } from '@nestjs/microservices';
-import { TransactionStatus } from '../transactions/enums/transaction-type.enum';
+import { TransactionStatus, TransactionType } from '../transactions/enums/transaction-type.enum';
+import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
 
 @Injectable()
 export class BillsService {
@@ -26,30 +27,47 @@ export class BillsService {
     this.logger.log('BillsService initialized');
   }
 
-  async processBillPayment(userId: string, createBillDto: CreateBillDto): Promise<BillResponseDto> {
+  async processBillPayment(userId: string, createBillDto: CreateBillDto) {
     try {
       // 1. Get user's wallet
       const wallet = await this.walletService.findByWalletUser(userId);
       if (!wallet) {
-        throw new NotFoundException('Wallet not found');
+        return CustomApiResponse.error({
+          status: 404,
+          message: 'Wallet not found',
+          error: 'Wallet not found'
+        });
       }
 
       // 2. Check if wallet has sufficient balance
       if (wallet.balance < createBillDto.amount) {
-        throw new Error('Insufficient balance');
+        return CustomApiResponse.error({
+          status: 400,
+          message: 'Insufficient balance',
+          error: 'Insufficient balance'
+        });
       }
 
       // 3. Create pending transaction
-      const transaction = await this.transactionsService.create({
-        userId,
+      const transactionData = {
+        walletId: wallet._id.toString(),
+        type: TransactionType.BILL_PAYMENT,
         amount: createBillDto.amount,
-        type: 'bill',
-        status: 'pending',
+        status: TransactionStatus.PENDING,
+        description: createBillDto.description || `Bill payment to ${createBillDto.provider}`,
+        reference: createBillDto.billReference || `BILL-${Date.now()}`,
         metadata: {
-          billReference: createBillDto.billReference,
-          provider: createBillDto.provider
+          provider: createBillDto.provider,
+          ...(createBillDto.metadata && { 
+            ...(typeof createBillDto.metadata === 'string' 
+              ? JSON.parse(createBillDto.metadata) 
+              : createBillDto.metadata
+            )
+          })
         }
-      });
+      };
+      
+      const transaction = await this.transactionsService.create(transactionData);
 
       // 4. Deduct amount from wallet
       await this.walletService.deductAmount(userId, createBillDto.amount, transaction._id.toString());
@@ -78,14 +96,18 @@ export class BillsService {
           provider: createBillDto.provider
         });
 
-        return {
-          transactionId: transaction._id.toString(),
-          status: TransactionStatus.SUCCESS,
-          amount: createBillDto.amount,
-          billReference: createBillDto.billReference,
-          provider: createBillDto.provider,
-          message: paymentResponse.message
-        };
+        return CustomApiResponse.success({
+          status: 200,
+          message: 'Payment successful',
+          data: {
+            transactionId: transaction._id.toString(),
+            status: TransactionStatus.SUCCESS,
+            amount: createBillDto.amount,
+            billReference: createBillDto.billReference,
+            provider: createBillDto.provider,
+            message: paymentResponse.message
+          }
+        });
       } else {
         // Emit payment failure event
         this.eventEmitter.emit('bill.payment.failure', {
@@ -96,7 +118,11 @@ export class BillsService {
           provider: createBillDto.provider
         });
 
-        throw new Error(paymentResponse?.message || 'Payment failed');
+        return CustomApiResponse.error({
+          status: 400,
+          message: 'Payment failed',
+          error: paymentResponse?.message || 'Payment failed'
+        });
       }
     } catch (error) {
       // Handle failures by rolling back
@@ -109,28 +135,54 @@ export class BillsService {
         });
       }
 
-      throw new Error('Bill payment failed. Your funds will be refunded shortly.');
+      return CustomApiResponse.error({
+        status: 500,
+        error: error.message || 'Bill payment failed. Your funds will be refunded shortly.'
+      });
     }
   }
 
-  async getPaymentStatus(transactionId: string, userId: string): Promise<BillResponseDto> {
-    const transaction = await this.transactionModel
+  async getPaymentStatus(transactionId: string, userId: string) {
+    try {
+      const transaction = await this.transactionModel
       .findById(transactionId)
       .where('userId', userId)
       .exec();
 
     if (!transaction) {
-      throw new NotFoundException('Transaction not found');
+      return CustomApiResponse.error({
+        status: 404,
+        message: 'Transaction not found',
+        error: 'Transaction not found'
+      });
     }
 
-    return {
-      transactionId,
-      status: transaction.status,
-      amount: transaction.amount,
-      billReference: transaction.metadata.billReference,
-      provider: transaction.metadata.provider,
-      message: transaction.metadata.message
-    } as BillResponseDto;
+    if (transaction.type !== TransactionType.BILL_PAYMENT) {
+      return CustomApiResponse.error({
+        status: 400,
+        message: 'Bill Transaction not found',
+        error: 'Bill Transaction not found'
+      });
+    }
+
+    return CustomApiResponse.success({
+      status: 200,
+      message: 'Transaction found',
+      data: {
+        transactionId,
+        status: transaction.status,
+        amount: transaction.amount,
+        billReference: transaction.metadata.billReference,
+        provider: transaction.metadata.provider,
+        message: transaction.metadata.message
+      }
+    });
+    } catch (error) {
+      return CustomApiResponse.error({
+        status: 500,
+        error: error.message || 'Failed to get transaction status'
+      });
+    }
   }
 
   private async handlePaymentFailure(userId: string, error: Error): Promise<void> {
