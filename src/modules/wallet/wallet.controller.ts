@@ -44,7 +44,7 @@ export class WalletController {
     if (req.user.roles.includes(UserRole.ADMIN)) {
       return await this.walletService.findAllAll(page, limit)
     }
-    return await this.walletService.findByWalletUser(req.user.id)
+    return await this.walletService.findByWalletUser(req.user._id)
   }
 
   @Post()
@@ -59,7 +59,8 @@ export class WalletController {
   @Post('fund')
   @ApiOperation({ summary: 'Fund wallet with specified amount' })
   async fund(@Body() fundWalletDto: FundWalletDto, @Request() req) {
-    return this.walletService.fundWallet(req.user.userId, fundWalletDto);
+    console.log(req.user)
+    return this.walletService.fundWallet(req.user.sub, fundWalletDto);
   }
 
   @Get('verify/:reference')
@@ -72,13 +73,13 @@ export class WalletController {
   @Get('balance')
   @ApiOperation({ summary: 'Get wallet balance' })
   async getBalance(@Request() req) {
-    return this.walletService.getBalance(req.user.sub.toString());
+    return this.walletService.getBalance(req.user._id.toString());
   }
 
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete wallet' })
   async delete(@Request() req, @Param('id') id: string) {
-    return this.walletService.deleteUserWallet(id, req.user.sub);
+    return this.walletService.deleteUserWallet(id, req.user._id);
   }
 }

@@ -108,11 +108,11 @@ export class AuthService {
       const newUser = await this.usersService.create(userData);
       
       // Create wallet for the new user
-      // await this.walletService.create({
-      //   userId: newUser._id.toString(),
-      //   balance: 0,
-      //   currency: 'NGN'
-      // });
+      await this.walletService.create({
+        userId: newUser._id.toString(),
+        balance: 0,
+        currency: 'NGN'
+      });
 
       // Convert to plain object and remove password
       const { password, ...result } = newUser.toObject();

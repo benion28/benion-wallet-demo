@@ -51,7 +51,7 @@ export class WalletUserController {
   @SwaggerResponse({ status: 404, description: 'User not found' })
   async findOne(@Param('id') id: string, @Request() req: any) {
     try {
-      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
+      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.sub;
       const user = await this.walletUserService.findOne(userId);
       if (!user) {
         throw new NotFoundException({
@@ -85,7 +85,7 @@ export class WalletUserController {
     @Request() req: any
   ) {
     try {
-      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
+      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.sub;
       const user = await this.walletUserService.findOne(userId);
       
       if (!user) {
@@ -117,7 +117,7 @@ export class WalletUserController {
   @SwaggerResponse({ status: 404, description: 'User not found' })
   async remove(@Param('id') id: string, @Request() req: any) {
     try {
-      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
+      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.sub;
       const user = await this.walletUserService.findOne(userId);
 
       if (!user) {

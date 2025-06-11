@@ -9,7 +9,7 @@ import { PaginationResponse } from './dto/pagination-response.dto';
 
 import { Wallet } from '../wallet/schemas/wallet.schema';
 import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
-import { TransactionStatus } from './enums/transaction-type.enum';
+import { TransactionStatus, TransactionType } from './enums/transaction-type.enum';
 import { UserRole } from '../auth/enums/user-role.enum';
 
 @Injectable()
@@ -70,7 +70,8 @@ export class TransactionsService {
         const objectData = {
           ...createTransactionDto,
           reference: createTransactionDto?.reference || `TRX-${Date.now()}`,
-          status: createTransactionDto?.status || TransactionStatus.PENDING
+          status: createTransactionDto?.status || TransactionStatus.PENDING,
+          type: TransactionType.MANUAL
         };
   
         // Create transaction

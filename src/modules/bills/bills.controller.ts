@@ -45,10 +45,10 @@ export class BillsController {
     }
   })
   async pay(
+    @Body() createBillDto: CreateBillDto,
     @Request() req,
-    @Body() createBillDto: CreateBillDto
-  ): Promise<BillResponseDto> {
-    return this.billsService.processBillPayment(req.user.userId, createBillDto);
+  ) {
+    return this.billsService.processBillPayment(req.user._id, createBillDto);
   }
 
   @Get('status/:transactionId')

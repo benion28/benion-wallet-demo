@@ -1,8 +1,9 @@
-import { IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, Min, IsOptional } from 'class-validator';
 
 export class CreateBillDto {
   @IsNotEmpty()
   @IsString()
+  @IsOptional()
   billReference: string;
 
   @IsNotEmpty()
@@ -15,5 +16,9 @@ export class CreateBillDto {
   provider: string;
 
   @IsString()
+  @IsOptional()
   metadata?: Record<string, any>;
+
+  @IsString()
+  description: string;
 }

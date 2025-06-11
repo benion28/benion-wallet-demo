@@ -136,8 +136,8 @@ export class TransactionsController {
       return await this.transactionsService.findAllPaginated(page, limit, userId)
       // return await this.transactionsService.findAll()
     }
-    // return await this.transactionsService.findAllUserPaginated(page, limit, req.user.id)
-    return await this.transactionsService.findByUserId(req.user.id)
+    // return await this.transactionsService.findAllUserPaginated(page, limit, req.user.sub)
+    return await this.transactionsService.findByUserId(req.user.sub)
   }
   
   // If you want to add pagination support:
