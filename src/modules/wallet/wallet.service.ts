@@ -8,8 +8,8 @@ import { BillsService } from '../bills/bills.service';
 import { CreateWalletDto } from './dto/create-wallet.dto';
 import { TransactionStatus } from '../transactions/enums/transaction-type.enum';
 import { FundWalletDto } from './dto/fund-wallet.dto';
-import { ApiResponse } from '../../common/utils/api-response.util';
-
+import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
+import { UserRole } from '../auth/enums/user-role.enum';
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
@@ -27,6 +27,73 @@ export class WalletService {
     return this.walletModel.findById(walletId).exec();
   }
 
+  async findByWalletUser(userId: string) {
+    try {
+      const wallet = await this.walletModel.findOne({ userId }).exec();
+      if (!wallet) {
+        throw new NotFoundException(`Wallet not found for user ${userId}`);
+      }
+      return wallet;
+    } catch (error) {
+      this.logger.error(`Error finding wallet for user ${userId}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async deductAmount(userId: string, amount: number, transactionId: string): Promise<void> {
+    try {
+      const wallet = await this.walletModel.findOneAndUpdate(
+        { userId },
+        { $inc: { balance: -amount } },
+        { new: true }
+      ).exec();
+
+      if (!wallet) {
+        throw new NotFoundException('Wallet not found');
+      }
+
+      // Create transaction record
+      await this.transactionsService.create({
+        userId,
+        amount,
+        status: 'pending',
+        type: 'debit',
+        metadata: { transactionId }
+      });
+
+    } catch (error) {
+      this.logger.error(`Error deducting amount from wallet: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async addAmount(userId: string, amount: number, transactionId: string): Promise<void> {
+    try {
+      const wallet = await this.walletModel.findOneAndUpdate(
+        { userId },
+        { $inc: { balance: amount } },
+        { new: true }
+      ).exec();
+
+      if (!wallet) {
+        throw new NotFoundException('Wallet not found');
+      }
+
+      // Create transaction record
+      await this.transactionsService.create({
+        userId,
+        amount,
+        status: 'success',
+        type: 'credit',
+        metadata: { transactionId }
+      });
+
+    } catch (error) {
+      this.logger.error(`Error adding amount to wallet: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
   async create(createWalletDto: CreateWalletDto) {
     try {
       // Check if wallet already exists for this user
@@ -35,7 +102,7 @@ export class WalletService {
       }).exec();
 
       if (existingWallet) {
-        return ApiResponse.error({
+        return CustomApiResponse.error({
           status: 409,
           message: 'User already has a wallet',
           error: 'User already has a wallet'
@@ -52,28 +119,22 @@ export class WalletService {
       const wallet = new this.walletModel(walletData);
       wallet.save();
       
-      return wallet;
+      return CustomApiResponse.success({
+        status: 201,
+        message: 'Wallet created successfully',
+        data: wallet
+      });
     } catch (error) {
       this.logger.error(`Error creating wallet: ${error.message}`, error.stack);
       // If it's a duplicate key error (MongoDB error code 11000)
       if (error.code === 11000) {
-        return ApiResponse.error({
+        return CustomApiResponse.error({
           status: 409,
           message: 'User already has a wallet',
           error: 'User already has a wallet'
         });
       }
-      return ApiResponse.error({
-        status: error.status || 500,
-        message: error.message,
-        error: error.name
-      });
     }
-  }
-
-  async findByWalletUser(userId: string) {
-    console.log(userId);
-    return await this.walletModel.findOne({ userId });
   }
 
     // Add a method to get or create wallet
@@ -86,11 +147,8 @@ export class WalletService {
         }
         return wallet;
       } catch (error) {
-        return ApiResponse.error({
-          status: error.status || 500,
-          message: error.message,
-          error: error.name
-        });
+        this.logger.error(`Error in getOrCreateWallet: ${error.message}`, error.stack);
+        throw error;
       }
     }
 
@@ -98,11 +156,7 @@ export class WalletService {
     try {
       const wallet = await this.walletModel.findOne({ userId }).exec();
       if (!wallet) {
-        return ApiResponse.error({
-          status: 404,
-          message: 'Wallet not found',
-          error: 'Wallet not found'
-        });
+        throw new NotFoundException('Wallet not found');
       }
   
       // Create transaction with pending status
@@ -123,11 +177,7 @@ export class WalletService {
       );
   
       if (!updatedWallet) {
-        return ApiResponse.error({
-          status: 500,
-          message: 'Failed to update wallet balance',
-          error: 'Failed to update wallet balance'
-        });
+        throw new HttpException('Failed to update wallet balance', HttpStatus.INTERNAL_SERVER_ERROR);
       }
   
       // Only update transaction status if balance update was successful
@@ -144,45 +194,48 @@ export class WalletService {
       if (error instanceof Error) {
         await this.transactionsService.updateStatus(fundDto.reference, TransactionStatus.FAILED);
       }
-      return ApiResponse.error({
-        status: error.status || 500,
-        message: error.message,
-        error: error.name
-      });
+      throw error; // Let NestJS handle the error
     }
   }
 
   async verifyFunding(reference: string) {
     const transaction = await this.transactionsService.findOne({ reference });
     if (!transaction) {
-      return ApiResponse.error({
+      return CustomApiResponse.error({
         status: 404,
         message: 'Transaction not found',
         error: 'Transaction not found'
       });
     }
 
-    return {
-      status: transaction.status,
-      amount: transaction.amount,
-      date: transaction.createdAt,
-      description: transaction.description
-    };
+    return CustomApiResponse.success({
+      message: 'Transaction verified successfully',
+      data: {
+        status: transaction.status,
+        amount: transaction.amount,
+        date: transaction.createdAt,
+        description: transaction.description
+      }
+    });
   }
 
   async getBalance(userId: string) {
     const wallet = await this.walletModel.findOne({ userId }).exec();
     if (!wallet) {
-      return ApiResponse.error({
+      return CustomApiResponse.error({
         status: 404,
         message: 'Wallet not found',
         error: 'Wallet not found'
       });
     }
-    return wallet.balance;
+    return CustomApiResponse.success({
+      status: 200,
+      message: 'Wallet balance retrieved successfully',
+      data: wallet.balance
+    });
   }
 
-  async findAllAll(page: number, limit: number, req: any) {
+  async findAllAll(page: number, limit: number) {
     try {
       const skip = (page - 1) * limit;
       
@@ -194,19 +247,17 @@ export class WalletService {
         this.walletModel.countDocuments()
       ]);
 
-      return {
-        wallets,
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit)
-      };
-    } catch (error) {
-      return ApiResponse.error({
-        status: error.status || 500,
-        message: error.message,
-        error: error.name
+      return CustomApiResponse.success({
+        data: wallets,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit)
+        }
       });
+    } catch (error) {
+      throw new HttpException(error.message, error.status || HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -230,34 +281,40 @@ export class WalletService {
         totalPages: Math.ceil(total / limit)
       };
     } catch (error) {
-      return ApiResponse.error({
+      return {
         status: error.status || 500,
         message: error.message,
         error: error.name
-      });
+      };
     }
   }
 
-  async deleteUserWallet(userId: string, req: any) {
-    const wallet = await this.walletModel.findOneAndDelete({ userId });
+  async deleteUserWallet(orIdFilter: string, req: any) {
+    const userId = req.user.role.includes(UserRole.ADMIN) ? orIdFilter : req.user.sub;
+    const wallet = await this.walletModel.findOne({ userId });
     if (!wallet) {
-      return ApiResponse.error({
+      return CustomApiResponse.error({
         status: 404,
         message: 'Wallet not found',
         error: 'Wallet not found'
       });
     }
-    return null;
+    await this.walletModel.deleteOne({ userId });
+    return CustomApiResponse.success({
+      status: 200,
+      message: 'Wallet deleted successfully',
+      data: wallet
+    });
   }
 
   async deleteWallet(req: any) {
     const wallet = await this.walletModel.findOneAndDelete({ userId: req.user.sub });
     if (!wallet) {
-      return ApiResponse.error({
+      return {
         status: 404,
         message: 'Wallet not found',
         error: 'Wallet not found'
-      });
+      };
     }
     return null;
   }

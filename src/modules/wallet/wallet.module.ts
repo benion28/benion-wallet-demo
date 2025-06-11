@@ -15,6 +15,11 @@ import { BillsModule } from '../bills/bills.module';
     forwardRef(() => TransactionsModule),
     forwardRef(() => BillsModule),
     PassportModule,
+    JwtModule.register({
+      secret: process.env.JWT_SECRET || 'your-secret-key',
+      signOptions: { expiresIn: '1d' },
+    }),
+    ConfigModule.forRoot(),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -22,7 +27,7 @@ import { BillsModule } from '../bills/bills.module';
         signOptions: { expiresIn: '1d' },
       }),
       inject: [ConfigService],
-    }),
+    })
   ],
   controllers: [WalletController],
   providers: [WalletService],
