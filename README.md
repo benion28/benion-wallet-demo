@@ -54,11 +54,12 @@ npm run test
 
 
 ### 📝 Environment Variable (for local development)
-
+```bash
 NODE_ENV=development
 PORT=8822
 MONGODB_URI=enter-your-mongodb-uri
 JWT_SECRET=enter-your-jwt-secret-key
 API_KEY=enter-your-api-key
+```
 
 
