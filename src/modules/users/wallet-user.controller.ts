@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, HttpStatus, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, HttpStatus, Request, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse as SwaggerResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -6,8 +6,9 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/enums/user-role.enum';
 import { CreateWalletUserDto } from './dto/create-wallet-user.dto';
 import { WalletUserService } from './wallet-user.service';
-import { ApiResponse } from '../../common/utils/api-response.util';
+
 import { UpdateWalletUserDto } from './dto/update-wallet-user.dto';
+import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
 
 @ApiTags('Users')
 @Controller('users')
@@ -24,17 +25,9 @@ export class WalletUserController {
   async create(@Body() createWalletUserDto: CreateWalletUserDto) {
     try {
       const user = await this.walletUserService.create(createWalletUserDto);
-      return ApiResponse.success({
-        status: HttpStatus.CREATED,
-        message: 'User created successfully',
-        data: user
-      });
+      return user;
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || HttpStatus.BAD_REQUEST,
-        message: error.message || 'Failed to create user',
-        error: error.name || 'BadRequest'
-      });
+      throw error;
     }
   }
 
@@ -45,17 +38,9 @@ export class WalletUserController {
   async findAll() {
     try {
       const users = await this.walletUserService.findAll();
-      return ApiResponse.success({
-        status: HttpStatus.OK,
-        message: 'Users retrieved successfully',
-        data: users
-      });
+      return users;
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-        message: error.message || 'Failed to retrieve users',
-        error: error.name || 'InternalServerError'
-      });
+      throw error;
     }
   }
 
@@ -66,25 +51,25 @@ export class WalletUserController {
   @SwaggerResponse({ status: 404, description: 'User not found' })
   async findOne(@Param('id') id: string, @Request() req: any) {
     try {
-      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
+      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.sub;
       const user = await this.walletUserService.findOne(userId);
       if (!user) {
-        return ApiResponse.error({
+        throw new NotFoundException({
           status: HttpStatus.NOT_FOUND,
           message: 'User not found',
           error: 'NotFound'
         });
       }
-      return ApiResponse.success({
-        status: HttpStatus.OK,
+      return CustomApiResponse.success({
         message: 'User retrieved successfully',
+        status: 200,
         data: user
       });
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-        message: error.message || 'Failed to retrieve user',
-        error: error.name || 'InternalServerError'
+      return CustomApiResponse.error({
+        message: 'User not found',
+        status: 404,
+        error: 'NotFound'
       });
     }
   }
@@ -100,25 +85,27 @@ export class WalletUserController {
     @Request() req: any
   ) {
     try {
-      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.id;
-      const user = await this.walletUserService.update(userId, updateWalletUserDto);
+      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.sub;
+      const user = await this.walletUserService.findOne(userId);
+      
       if (!user) {
-        return ApiResponse.error({
-          status: HttpStatus.NOT_FOUND,
+        return CustomApiResponse.error({
           message: 'User not found',
+          status: 404,
           error: 'NotFound'
         });
       }
-      return ApiResponse.success({
-        status: HttpStatus.OK,
+      const updatedUser = await this.walletUserService.update(userId, updateWalletUserDto);
+      return CustomApiResponse.success({
         message: 'User updated successfully',
-        data: user
+        status: 200,
+        data: updatedUser
       });
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-        message: error.message || 'Failed to update user',
-        error: error.name || 'InternalServerError'
+      return CustomApiResponse.error({
+        message: 'User not found',
+        status: 404,
+        error: 'NotFound'
       });
     }
   }
@@ -128,19 +115,30 @@ export class WalletUserController {
   @ApiOperation({ summary: 'Delete user' })
   @SwaggerResponse({ status: 200, description: 'User deleted successfully' })
   @SwaggerResponse({ status: 404, description: 'User not found' })
-  async remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @Request() req: any) {
     try {
-      await this.walletUserService.remove(id);
-      return ApiResponse.success({
-        status: 200,
+      const userId = req.user.roles.includes(UserRole.ADMIN) ? id : req.user.sub;
+      const user = await this.walletUserService.findOne(userId);
+
+      if (!user) {
+        return CustomApiResponse.error({
+          message: 'User not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+      
+      await this.walletUserService.remove(userId);
+      return CustomApiResponse.success({
         message: 'User deleted successfully',
-        data: null,
+        status: 200,
+        data: null
       });
     } catch (error) {
-      return ApiResponse.error({
-        status: error.status || 500,
-        message: error.message || 'Failed to delete user',
-        error: error.name,
+      return CustomApiResponse.error({
+        message: 'User not found',
+        status: 404,
+        error: 'NotFound'
       });
     }
   }

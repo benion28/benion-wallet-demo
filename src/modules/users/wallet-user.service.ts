@@ -7,6 +7,7 @@ import { CreateWalletUserDto } from './dto/create-wallet-user.dto';
 import * as bcrypt from 'bcrypt';
 import { UserRole } from '../auth/enums/user-role.enum';
 import { UpdateWalletUserDto } from './dto/update-wallet-user.dto';
+import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
 
 @Injectable()
 export class WalletUserService {
@@ -16,34 +17,41 @@ export class WalletUserService {
   ) {}
 
   async findAll() {
-    return this.walletUserModel.find().exec();
+    const users = await this.walletUserModel.find().exec();
+    return CustomApiResponse.success({
+      message: 'Users retrieved successfully',
+      status: 200,
+      data: users
+    });
   }
 
-  async findOne(id: string) {
-    return this.walletUserModel.findById(id).exec();
+  async findOne(id: string): Promise<WalletUserDocument | null> {
+    return await this.walletUserModel.findById(id).exec();
   }
 
-  async findById(id: string) {
-    return this.walletUserModel.findById(id).exec();
+  async findById(id: string): Promise<WalletUserDocument | null> {
+    return await this.walletUserModel.findById(id).exec();
   }
 
   async findByIdAndPopulate(id: string) {
-    return this.walletUserModel.findById(id).populate('roles').exec();
+    return CustomApiResponse.success({
+      data: await this.walletUserModel.findById(id).populate('roles').exec()
+    });
   }
 
-  async findByEmail(email: string) {
+  async findByEmail(email: string): Promise<WalletUserDocument> {
     try {
-      return await this.walletUserModel
-        .findOne({ email })
-        .select('+password') // Include password for validation
-        .exec();
+      return this.walletUserModel
+          .findOne({ email })
+          .select('+password') // Include password for validation
+          .exec();
     } catch (error) {
       console.error('Error finding user by email:', error);
       return null;
     }
   }
 
-  async create(createUserDto: CreateWalletUserDto) {
+  async create(createUserDto: CreateWalletUserDto): Promise<WalletUserDocument> {
     try {
       // Create the user document
       const user = new this.walletUserModel({
@@ -59,16 +67,16 @@ export class WalletUserService {
       const savedUser = await user.save();
       
       // Convert to plain object and remove password
-      const result = savedUser.toObject();
+      const result = savedUser;
       delete result.password;
       
       return result;
     } catch (error) {
       if (error.code === 11000) {
-        throw new ConflictException('Email already exists');
+        return null;
       }
       console.error('Error creating user:', error);
-      throw error;
+      return null;
     }
   }
 
@@ -88,17 +96,25 @@ export class WalletUserService {
       .exec();
 
     if (!updatedUser) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      return CustomApiResponse.error({
+        error: `User with ID ${id} not found`
+      });
     }
 
-    return updatedUser;
+    return CustomApiResponse.success({
+      data: updatedUser
+    });
   }
 
   async remove(id: string) {
     const result = await this.walletUserModel.findByIdAndDelete(id).exec();
     if (!result) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      return CustomApiResponse.error({
+        error: `User with ID ${id} not found`
+      });
     }
-    return result;
+    return CustomApiResponse.success({
+      data: result
+    });
   }
 }

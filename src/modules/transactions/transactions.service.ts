@@ -1,17 +1,21 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Document } from 'mongoose';
+import { Model } from 'mongoose';
 import { Transaction } from './schemas/transaction.schema';
 import { VerifyTransactionResponseDto } from './dto/verify-transaction.response.dto';
 import { WalletService } from '../wallet/wallet.service';
 import { forwardRef } from '@nestjs/common';
-import { ApiResponse } from '../../common/utils/api-response.util';
+import { PaginationResponse } from './dto/pagination-response.dto';
+
 import { Wallet } from '../wallet/schemas/wallet.schema';
+import { CustomApiResponse } from '../../common/interfaces/api-response.interface';
+import { TransactionStatus, TransactionType } from './enums/transaction-type.enum';
+import { UserRole } from '../auth/enums/user-role.enum';
 
 @Injectable()
 export class TransactionsService {
   constructor(
-    @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
+    @InjectModel('Transaction') private transactionModel: Model<Transaction>,
     @Inject(forwardRef(() => WalletService))
     private readonly walletService: WalletService
   ) {}
@@ -32,11 +36,7 @@ export class TransactionsService {
   async findByWalletId(userId: string) {
     const wallet = await this.walletService.findByWalletUser(userId);
     if (!wallet) {
-      return ApiResponse.error({
-        status: 404,
-        message: 'User Wallet not found',
-        error: 'User Wallet not found'
-      });
+      throw new NotFoundException('User Wallet not found');
     }
     return wallet;
   }
@@ -51,8 +51,161 @@ export class TransactionsService {
 
   // Add this method for creating transactions
   async create(createTransactionDto: any) {
-    const transaction = new this.transactionModel(createTransactionDto);
-    return transaction.save();
+    try {
+      // Ensure required fields are present
+      const transactionData = {
+        ...createTransactionDto,
+        status: createTransactionDto.status || TransactionStatus.PENDING,
+        reference: createTransactionDto.reference || `TRX-${Date.now()}`,
+        description: createTransactionDto.description || 'Transaction',
+        type: createTransactionDto.type || TransactionType.MANUAL,
+        walletId: createTransactionDto.walletId || null,
+        amount: createTransactionDto.amount || 0,
+        metadata: createTransactionDto.metadata || {}
+      };
+
+      // Log the data being saved for debugging
+      console.log('Creating transaction with data:', JSON.stringify(transactionData, null, 2));
+
+      const transaction = new this.transactionModel(transactionData);
+      const savedTransaction = await transaction.save();
+      
+      return savedTransaction;
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      throw error;
+    }
+  }
+
+  async handleCreate(createTransactionDto: any) {
+    try {
+      // Validate wallet exists if walletId is provided
+      if (createTransactionDto.walletId) {
+        const wallet = await this.walletService.findByWalletId(createTransactionDto.walletId);
+        if (!wallet) {
+          return CustomApiResponse.error({
+            message: 'Wallet not found',
+            status: 404,
+            error: 'Wallet does not exist'
+          });
+        }
+      }
+
+      // Format the transaction data
+      const transactionData = {
+        ...createTransactionDto,
+        status: createTransactionDto.status || TransactionStatus.PENDING,
+        reference: createTransactionDto.reference || `TRX-${Date.now()}`,
+        description: createTransactionDto.description || 'Transaction',
+        type: createTransactionDto.type || TransactionType.MANUAL,
+        walletId: createTransactionDto.walletId,
+        amount: createTransactionDto.amount || 0,
+        metadata: createTransactionDto.metadata || {}
+      };
+
+      // Create transaction
+      const transaction = await this.create(transactionData);
+
+      return CustomApiResponse.success({
+        message: 'Transaction created successfully',
+        status: 201,
+        data: transaction
+      });
+    } catch (error) {
+      console.error('Error in handleCreate:', error);
+      return CustomApiResponse.error({
+        message: 'Failed to create transaction',
+        status: 500,
+        error: error.message || 'Internal server error'
+      });
+    }
+  }
+
+  async handleFindOne(idOrFilter: any, user: any) {
+    try {
+      const transaction = await this.findOne(idOrFilter);
+      
+      if (!transaction) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+
+      // If not admin, ensure user can only access their own transactions
+      const wallet = await this.walletService.findByWalletId(transaction.walletId.toString());
+      const walletUserId = wallet.userId.toString();
+      const userId = user.roles.includes(UserRole.ADMIN) ? idOrFilter : user.id;
+      if (!user.roles.includes(UserRole.ADMIN) && walletUserId !== userId) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+
+      return CustomApiResponse.success({
+        message: 'Transaction retrieved successfully',
+        status: 200,
+        data: transaction
+      });
+    } catch (error) {
+      return CustomApiResponse.error({
+        message: 'Transaction not found',
+        status: 404,
+        error: 'NotFound'
+      });
+    }
+  }
+
+  async handleDelete(idOrFilter: string, user: any) {
+    try {
+      // First find the transaction to validate it exists
+      const transaction = await this.findOne(idOrFilter);
+      
+      if (!transaction) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+
+      // If not admin, ensure user can only access their own transactions
+      const wallet = await this.walletService.findByWalletId(transaction.walletId.toString());
+      const walletUserId = wallet.userId.toString();
+      const userId = user.roles.includes(UserRole.ADMIN) ? idOrFilter : user.id;
+      if (!user.roles.includes(UserRole.ADMIN) && walletUserId !== userId) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+
+      // Delete the transaction
+      const deletedTransaction = await this.delete(idOrFilter);
+      
+      if (!deletedTransaction) {
+        return CustomApiResponse.error({
+          message: 'Transaction not found',
+          status: 404,
+          error: 'NotFound'
+        });
+      }
+
+      return CustomApiResponse.success({
+        message: 'Transaction deleted successfully',
+        status: 200
+      });
+    } catch (error) {
+      return CustomApiResponse.error({
+        message: 'Transaction not found',
+        status: 404,
+        error: 'NotFound'
+      });
+    }
   }
 
   // Add these methods
@@ -62,37 +215,21 @@ export class TransactionsService {
       const wallet = await this.findByWalletId(userId);
       
       if (!wallet) {
-        return ApiResponse.error({
-          status: 404,
-          message: 'Wallet not found',
-          error: 'Wallet not found'
-        });
+        throw new NotFoundException('Wallet not found');
       }
       
       // Then find transactions for this wallet
-      const walletDoc = wallet as Document & Wallet;
+      const walletDoc = wallet as unknown as Document & Wallet;
       const transactions = await this.transactionModel.find({ walletId: walletDoc._id });
   
-      if (!transactions) {
-        return ApiResponse.success({
-          status: 200,
-          message: 'No transactions found',
-          data: []
-        });
+      if (!transactions.length) {
+        return [];
       }
   
-      return ApiResponse.success({
-        status: 200,
-        message: 'Transactions retrieved successfully',
-        data: transactions
-      });
+      return transactions;
     } catch (error) {
       console.error('Error finding transactions:', error);
-      return ApiResponse.error({
-        status: error.status || 500,
-        message: error.message || 'Failed to retrieve transactions',
-        error: error.name
-      });
+      throw new InternalServerErrorException('Failed to retrieve transactions');
     }
   }
 
@@ -107,11 +244,13 @@ export class TransactionsService {
   }
 
   async findAll() {
-    return ApiResponse.success({
-      status: 200,
-      message: 'Transactions retrieved successfully',
-      data: this.transactionModel.find().sort({ createdAt: -1 })
-    });
+    try {
+      const transactions = await this.transactionModel.find().sort({ createdAt: -1 }).exec();
+      return transactions;
+    } catch (error) {
+      console.error('Error finding all transactions:', error);
+      throw new InternalServerErrorException('Failed to retrieve transactions');
+    }
   }
 
   // Add pagination method if needed
@@ -128,9 +267,7 @@ export class TransactionsService {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    return ApiResponse.success({
-      status: 200,
-      message: 'Transactions retrieved successfully',
+    return CustomApiResponse.success({
       data: transactions,
       pagination: {
         total,
@@ -155,9 +292,7 @@ export class TransactionsService {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    return ApiResponse.success({
-      status: 200,
-      message: 'Transactions retrieved successfully',
+    return CustomApiResponse.success({
       data: transactions,
       pagination: {
         total,
