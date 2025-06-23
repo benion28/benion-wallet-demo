@@ -101,8 +101,7 @@ export class AuthService {
       const hashedPassword = await bcrypt.hash(registerDto.password, 10);
       const userData: CreateWalletUserDto = {
         ...registerDto,
-        password: hashedPassword,
-        roles: [UserRole.USER]
+        password: hashedPassword
       };
 
       const newUser = await this.usersService.create(userData);

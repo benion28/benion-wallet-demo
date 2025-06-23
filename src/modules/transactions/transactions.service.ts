@@ -64,9 +64,6 @@ export class TransactionsService {
         metadata: createTransactionDto.metadata || {}
       };
 
-      // Log the data being saved for debugging
-      console.log('Creating transaction with data:', JSON.stringify(transactionData, null, 2));
-
       const transaction = new this.transactionModel(transactionData);
       const savedTransaction = await transaction.save();
       

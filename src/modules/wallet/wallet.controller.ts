@@ -7,7 +7,6 @@ import { FundWalletDto } from './dto/fund-wallet.dto';
 import { UserRole } from '../auth/enums/user-role.enum';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { Wallet } from './schemas/wallet.schema';
 
 @ApiTags('Wallet')
 @ApiBearerAuth()
@@ -44,7 +43,7 @@ export class WalletController {
     if (req.user.roles.includes(UserRole.ADMIN)) {
       return await this.walletService.findAllAll(page, limit)
     }
-    return await this.walletService.findByWalletUser(req.user._id)
+    return await this.walletService.findByWalletUser(req.user.sub)
   }
 
   @Post()
@@ -59,7 +58,6 @@ export class WalletController {
   @Post('fund')
   @ApiOperation({ summary: 'Fund wallet with specified amount' })
   async fund(@Body() fundWalletDto: FundWalletDto, @Request() req) {
-    console.log(req.user)
     return this.walletService.fundWallet(req.user.sub, fundWalletDto);
   }
 
@@ -73,13 +71,13 @@ export class WalletController {
   @Get('balance')
   @ApiOperation({ summary: 'Get wallet balance' })
   async getBalance(@Request() req) {
-    return this.walletService.getBalance(req.user._id.toString());
+    return this.walletService.getBalance(req.user.sub);
   }
 
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete wallet' })
   async delete(@Request() req, @Param('id') id: string) {
-    return this.walletService.deleteUserWallet(id, req.user._id);
+    return this.walletService.deleteUserWallet(id, req.user.sub);
   }
 }
